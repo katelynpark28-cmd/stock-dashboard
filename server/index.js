@@ -479,7 +479,7 @@ app.post('/api/trader/run', async (req, res) => {
 // In production, serve the built React frontend
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
-app.get('*', (req, res, next) => {
+app.get('{*path}', (req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(distPath, 'index.html'));
 });
