@@ -1,10 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import YahooFinanceClass from 'yahoo-finance2';
 import Groq from 'groq-sdk';
 import 'dotenv/config';
 import { getAccountSummary, getPositions, getRecentOrders } from './alpaca.js';
 import { trader } from './trader.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Last-resort safety net: a stray rejection or async error must never take the
 // whole API server down (that's what caused the 502). Log and keep serving.
@@ -472,7 +476,15 @@ app.post('/api/trader/run', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-const PORT = 3001;
+// In production, serve the built React frontend
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
   trader.init();
