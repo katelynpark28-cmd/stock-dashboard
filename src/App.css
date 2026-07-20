@@ -967,7 +967,7 @@ body {
 
 /* Scrolling ticker tape */
 .at-tape-wrap { overflow: hidden; background: #12141d; border-bottom: 1px solid #2d3148; padding: 10px 0; margin-bottom: 18px; border-radius: 10px; }
-.at-attribution { text-align: center; color: #6b7280; font-size: 0.75rem; margin: 0; padding: 8px 12px; line-height: 1.4; background: #0d0f17; border-bottom: 1px solid #1e2130; }
+.at-attribution { color: #6b7280; font-size: 0.65rem; margin: 0 0 0 auto; padding: 0; line-height: 1.4; text-align: right; max-width: 420px; }
 .at-attribution a { color: #4f6ef7; text-decoration: none; }
 .at-attribution a:hover { text-decoration: underline; }
 .at-tape { display: flex; gap: 40px; white-space: nowrap; animation: tape-scroll 30s linear infinite; width: max-content; }
