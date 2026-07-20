@@ -397,8 +397,7 @@ export default function AutoTrader() {
         </div>
       </div>
 
-      {/* Bot control — admin only */}
-      {isAdmin && (
+      {/* Bot control — read-only for visitors, editable for admin */}
       <div className="at-panel">
         <div className="at-bot-header">
           <div>
@@ -424,10 +423,10 @@ export default function AutoTrader() {
             )}
           </div>
           <div className="at-bot-actions">
-            <button className="at-run-btn" onClick={runNow} disabled={running}>
+            <button className="at-run-btn" onClick={runNow} disabled={running || !isAdmin}>
               {running ? 'Analyzing…' : 'Run analysis now'}
             </button>
-            <button className={`at-toggle ${enabled ? 'on' : 'off'}`} onClick={toggleEnabled} disabled={saving}>
+            <button className={`at-toggle ${enabled ? 'on' : 'off'}`} onClick={toggleEnabled} disabled={saving || !isAdmin}>
               <span className="at-toggle-knob" />
               {enabled ? 'Turn OFF' : 'Turn ON'}
             </button>
@@ -442,13 +441,13 @@ export default function AutoTrader() {
               {form.watchlistText.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).map(sym => (
                 <span className="at-wl-tag" key={sym}>
                   {sym}
-                  <button className="at-wl-remove" onClick={() => {
+                  {isAdmin && <button className="at-wl-remove" onClick={() => {
                     const list = form.watchlistText.split(',').map(s => s.trim().toUpperCase()).filter(s => s && s !== sym);
                     setForm({ ...form, watchlistText: list.join(', ') });
-                  }}>×</button>
+                  }}>×</button>}
                 </span>
               ))}
-              <div className="at-wl-add">
+              {isAdmin && <div className="at-wl-add">
                 <input
                   className="at-wl-input"
                   placeholder="TICKER"
@@ -472,47 +471,47 @@ export default function AutoTrader() {
                   }
                   setNewTicker('');
                 }}>Add</button>
-              </div>
+              </div>}
             </div>
           </div>
           <label className="at-field">
             <span>Check every (min)</span>
-            <input type="number" min="1" max="240" value={form.intervalMinutes}
+            <input type="number" min="1" max="240" value={form.intervalMinutes} disabled={!isAdmin}
               onChange={e => setForm({ ...form, intervalMinutes: e.target.value })} />
           </label>
           <label className="at-field">
             <span>$ per trade</span>
-            <input type="number" min="1" value={form.perTradeDollars}
+            <input type="number" min="1" value={form.perTradeDollars} disabled={!isAdmin}
               onChange={e => setForm({ ...form, perTradeDollars: e.target.value })} />
           </label>
           <label className="at-field">
             <span>Max $ per position</span>
-            <input type="number" min="1" value={form.maxPositionDollars}
+            <input type="number" min="1" value={form.maxPositionDollars} disabled={!isAdmin}
               onChange={e => setForm({ ...form, maxPositionDollars: e.target.value })} />
           </label>
           <label className="at-field">
             <span>Max trades / day</span>
-            <input type="number" min="1" value={form.maxTradesPerDay}
+            <input type="number" min="1" value={form.maxTradesPerDay} disabled={!isAdmin}
               onChange={e => setForm({ ...form, maxTradesPerDay: e.target.value })} />
           </label>
           <label className="at-field">
             <span>Min confidence (0–1)</span>
-            <input type="number" min="0" max="1" step="0.05" value={form.minConfidence}
+            <input type="number" min="0" max="1" step="0.05" value={form.minConfidence} disabled={!isAdmin}
               onChange={e => setForm({ ...form, minConfidence: e.target.value })} />
           </label>
           <label className="at-field">
             <span>Stop loss %</span>
-            <input type="number" max="0" step="0.5" value={form.stopLossPct}
+            <input type="number" max="0" step="0.5" value={form.stopLossPct} disabled={!isAdmin}
               onChange={e => setForm({ ...form, stopLossPct: e.target.value })} />
           </label>
           <label className="at-field">
             <span>Take profit %</span>
-            <input type="number" min="0" step="0.5" value={form.takeProfitPct}
+            <input type="number" min="0" step="0.5" value={form.takeProfitPct} disabled={!isAdmin}
               onChange={e => setForm({ ...form, takeProfitPct: e.target.value })} />
           </label>
-          <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
+          {isAdmin && <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
             {saving ? 'Saving…' : 'Save settings'}
-          </button>
+          </button>}
         </div>
 
         {/* Per-ticker exit overrides */}
@@ -522,9 +521,9 @@ export default function AutoTrader() {
               <h3 className="at-overrides-title">Per-Ticker Exit Rules</h3>
               <p className="at-overrides-sub">Leave blank to use the global defaults above.</p>
             </div>
-            <button className="at-atr-btn" onClick={autoSetFromATR} disabled={atrLoading}>
+            {isAdmin && <button className="at-atr-btn" onClick={autoSetFromATR} disabled={atrLoading}>
               {atrLoading ? 'Calculating…' : 'Auto-set from volatility'}
-            </button>
+            </button>}
           </div>
           <div className="at-overrides-grid">
             {trader.config.watchlist.map(sym => {
@@ -538,14 +537,14 @@ export default function AutoTrader() {
                   <span className="at-ovr-sym">{sym}</span>
                   <label className="at-ovr-field">
                     <span>SL %</span>
-                    <input type="number" max="0" step="0.5"
+                    <input type="number" max="0" step="0.5" disabled={!isAdmin}
                       placeholder={form.stopLossPct}
                       value={ovr.stopLossPct ?? ''}
                       onChange={e => setOvr('stopLossPct', e.target.value)} />
                   </label>
                   <label className="at-ovr-field">
                     <span>TP %</span>
-                    <input type="number" min="0" step="0.5"
+                    <input type="number" min="0" step="0.5" disabled={!isAdmin}
                       placeholder={form.takeProfitPct}
                       value={ovr.takeProfitPct ?? ''}
                       onChange={e => setOvr('takeProfitPct', e.target.value)} />
@@ -556,7 +555,6 @@ export default function AutoTrader() {
           </div>
         </div>
       </div>
-      )}
 
       {/* Equity curve — hidden by default */}
       <div className="at-panel">
