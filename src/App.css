@@ -1018,3 +1018,29 @@ body {
 /* Equity curve head with show/hide */
 .at-equity-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .at-equity-head .at-panel-title { margin-bottom: 0; }
+
+/* Patterns guide button */
+.at-patterns-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid #3d4260; background: transparent; color: #6b7280; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: -4px; }
+.at-patterns-btn:hover { border-color: #4f6ef7; color: #8da2fb; background: rgba(79,110,247,0.1); }
+
+/* Patterns modal */
+.at-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: fadeIn 0.15s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.at-modal { background: #13151f; border: 1px solid #2d3148; border-radius: 14px; max-width: 680px; width: 92vw; max-height: 85vh; overflow-y: auto; animation: modalSlide 0.2s ease-out; }
+@keyframes modalSlide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+.at-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid #2d3148; }
+.at-modal-header h3 { margin: 0; font-size: 1rem; color: #e2e8f0; }
+.at-modal-close { background: none; border: none; color: #6b7280; font-size: 1.5rem; cursor: pointer; padding: 0 4px; line-height: 1; }
+.at-modal-close:hover { color: #e2e8f0; }
+.at-modal-body { padding: 18px 22px 24px; }
+.at-pattern-section { margin-bottom: 20px; }
+.at-pattern-section:last-child { margin-bottom: 0; }
+.at-pattern-heading { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #1e2130; }
+.at-pattern-heading.bullish { color: #4ade80; }
+.at-pattern-heading.bearish { color: #f87171; }
+.at-pattern-heading.neutral { color: #6b7280; }
+.at-pattern-grid { display: flex; flex-direction: column; gap: 12px; }
+.at-pattern-card { display: flex; gap: 14px; align-items: flex-start; background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 16px; }
+.at-pattern-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; min-width: 50px; }
+.at-pattern-info strong { color: #e2e8f0; font-size: 0.85rem; display: block; margin-bottom: 4px; }
+.at-pattern-info p { color: #9ca3af; font-size: 0.78rem; line-height: 1.5; margin: 0; }

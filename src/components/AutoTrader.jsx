@@ -34,6 +34,7 @@ export default function AutoTrader() {
   const [equityVisible, setEquityVisible] = useState(false);
   const [candlePeriod, setCandlePeriod] = useState('1D');
   const [linePeriod, setLinePeriod] = useState('1M');
+  const [showPatterns, setShowPatterns] = useState(false);
 
   // Auto-scroll state
   const [autoScroll, setAutoScroll] = useState(true);
@@ -353,6 +354,7 @@ export default function AutoTrader() {
           <div className="at-chart-half">
             <div className="at-chart-label-row">
               <h3 className="at-chart-label">Candlestick</h3>
+              <button className="at-patterns-btn" onClick={() => setShowPatterns(true)} title="Candlestick patterns guide">?</button>
               <div className="at-interval-picker">
                 {['1D', '1W', '1M', '3M', '1Y'].map(p => (
                   <button key={p}
@@ -726,6 +728,124 @@ export default function AutoTrader() {
           </div>
         ))}
       </div>
+
+      {showPatterns && (
+        <div className="at-modal-overlay" onClick={() => setShowPatterns(false)}>
+          <div className="at-modal" onClick={e => e.stopPropagation()}>
+            <div className="at-modal-header">
+              <h3>Candlestick Patterns Guide</h3>
+              <button className="at-modal-close" onClick={() => setShowPatterns(false)}>&times;</button>
+            </div>
+            <div className="at-modal-body">
+              <div className="at-pattern-section">
+                <h4 className="at-pattern-heading bullish">Bullish Patterns</h4>
+                <div className="at-pattern-grid">
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="15" width="20" height="30" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Hammer</strong>
+                      <p>Small body at the top with a long lower wick. Signals a potential reversal after a downtrend — buyers stepped in and pushed the price back up.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 80 80" width="80" height="80"><rect x="5" y="20" width="20" height="40" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="15" y1="10" x2="15" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="35" y="15" width="20" height="50" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="45" y1="5" x2="45" y2="75" stroke="#4ade80" strokeWidth="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Bullish Engulfing</strong>
+                      <p>A large green candle completely engulfs the previous red candle. Strong reversal signal showing buyers have overwhelmed sellers.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="30" width="20" height="5" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="1"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Dragonfly Doji</strong>
+                      <p>Open and close are nearly equal at the top with a long lower wick. Indicates rejection of lower prices and potential upward reversal.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 120 80" width="120" height="80"><rect x="5" y="40" width="16" height="25" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="13" y1="30" x2="13" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="25" y="45" width="16" height="20" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="33" y1="35" x2="33" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="45" y="50" width="16" height="15" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="53" y1="40" x2="53" y2="72" stroke="#f87171" strokeWidth="2"/><rect x="70" y="20" width="16" height="45" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="78" y1="10" x2="78" y2="72" stroke="#4ade80" strokeWidth="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Morning Star</strong>
+                      <p>Three-candle pattern: a long red candle, a small-bodied candle that gaps down, then a long green candle. Signals a strong bottom reversal.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="at-pattern-section">
+                <h4 className="at-pattern-heading bearish">Bearish Patterns</h4>
+                <div className="at-pattern-grid">
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#f87171" strokeWidth="2"/><rect x="10" y="45" width="20" height="30" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Shooting Star</strong>
+                      <p>Small body at the bottom with a long upper wick. After an uptrend, signals sellers pushed the price back down — potential reversal.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 80 80" width="80" height="80"><rect x="5" y="15" width="20" height="40" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="15" y1="5" x2="15" y2="70" stroke="#4ade80" strokeWidth="2"/><rect x="35" y="10" width="20" height="55" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="45" y1="5" x2="45" y2="75" stroke="#f87171" strokeWidth="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Bearish Engulfing</strong>
+                      <p>A large red candle completely engulfs the previous green candle. Shows sellers have taken control — strong reversal to the downside.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#f87171" strokeWidth="2"/><rect x="10" y="45" width="20" height="5" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="1"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Gravestone Doji</strong>
+                      <p>Open and close are nearly equal at the bottom with a long upper wick. Signals rejection of higher prices and potential drop.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 120 80" width="120" height="80"><rect x="5" y="15" width="16" height="25" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="13" y1="8" x2="13" y2="50" stroke="#4ade80" strokeWidth="2"/><rect x="25" y="10" width="16" height="20" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="33" y1="5" x2="33" y2="40" stroke="#4ade80" strokeWidth="2"/><rect x="45" y="8" width="16" height="15" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="53" y1="3" x2="53" y2="30" stroke="#4ade80" strokeWidth="2"/><rect x="70" y="10" width="16" height="50" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="78" y1="5" x2="78" y2="68" stroke="#f87171" strokeWidth="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Evening Star</strong>
+                      <p>Three-candle pattern: a long green candle, a small-bodied candle that gaps up, then a long red candle. Signals a top reversal.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="at-pattern-section">
+                <h4 className="at-pattern-heading neutral">Reading the Candle</h4>
+                <div className="at-pattern-grid">
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 60 80" width="60" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="20" width="20" height="35" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><text x="42" y="12" fill="#6b7280" fontSize="8">High</text><text x="42" y="27" fill="#4ade80" fontSize="8">Close</text><text x="42" y="58" fill="#4ade80" fontSize="8">Open</text><text x="42" y="78" fill="#6b7280" fontSize="8">Low</text><line x1="37" y1="8" x2="22" y2="8" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="24" x2="30" y2="24" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="55" x2="30" y2="55" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="75" x2="22" y2="75" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Anatomy of a Candle</strong>
+                      <p>The body shows open-to-close range. Green = close above open (bullish). Red = close below open (bearish). Wicks show the high and low reached during the period.</p>
+                    </div>
+                  </div>
+                  <div className="at-pattern-card">
+                    <div className="at-pattern-icon">
+                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#6b7280" strokeWidth="2"/><rect x="10" y="37" width="20" height="6" fill="#1a1d27" stroke="#6b7280" strokeWidth="2" rx="1"/></svg>
+                    </div>
+                    <div className="at-pattern-info">
+                      <strong>Doji</strong>
+                      <p>Open and close are nearly equal, creating a cross shape. Signals indecision — neither buyers nor sellers are in control. Watch for the next candle to confirm direction.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
