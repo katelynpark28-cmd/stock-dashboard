@@ -22,7 +22,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [view, setView] = useState('research'); // 'research' | 'trader'
+  const [view, setView] = useState('trader'); // 'research' | 'trader'
   const debouncedQuery = useDebounce(ticker, 220);
   const wrapperRef = useRef(null);
 

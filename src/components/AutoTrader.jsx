@@ -19,6 +19,7 @@ const timeAgo = (iso) => {
 };
 
 export default function AutoTrader() {
+  const isAdmin = new URLSearchParams(window.location.search).has('admin');
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -31,7 +32,7 @@ export default function AutoTrader() {
   const [candleSymbol, setCandleSymbol] = useState('');
   const [newTicker, setNewTicker] = useState('');
   const [equityVisible, setEquityVisible] = useState(false);
-  const [candleInterval, setCandleInterval] = useState('5m');
+  const [candlePeriod, setCandlePeriod] = useState('1D');
   const [linePeriod, setLinePeriod] = useState('1M');
 
   // Auto-scroll state
@@ -75,11 +76,11 @@ export default function AutoTrader() {
   // Fetch ticker tape prices (watchlist + ^GSPC)
   useEffect(() => {
     if (!trader) return;
-    const symbols = [...trader.config.watchlist, '^GSPC'];
+    const symbols = [...trader.config.watchlist, '^GSPC', '^DJI', '^IXIC'];
     fetchPrices(symbols).then(setTickerPrices).catch(() => {});
     const id = setInterval(() => {
       fetchPrices(symbols).then(setTickerPrices).catch(() => {});
-    }, 15000);
+    }, 30000);
     return () => clearInterval(id);
   }, [trader?.config.watchlist.join(',')]);
 
@@ -260,7 +261,7 @@ export default function AutoTrader() {
           <div className="at-tape">
             {tapeItems.map((t, i) => (
               <span className="at-tape-item" key={i}>
-                <span className="at-tape-sym">{t.symbol === '^GSPC' ? 'S&P 500' : t.symbol}</span>
+                <span className="at-tape-sym">{t.symbol === '^GSPC' ? 'S&P 500' : t.symbol === '^DJI' ? 'Dow Jones' : t.symbol === '^IXIC' ? 'NASDAQ' : t.symbol}</span>
                 <span className="at-tape-price">{t.price != null ? `$${t.price.toFixed(2)}` : '—'}</span>
                 <span className={`at-tape-change ${(t.change ?? 0) >= 0 ? 'pos' : 'neg'}`}>
                   {t.change != null ? `${t.change >= 0 ? '+' : ''}${t.change.toFixed(2)}%` : ''}
@@ -268,6 +269,9 @@ export default function AutoTrader() {
               </span>
             ))}
           </div>
+          <p className="at-attribution">
+            This tool is built by Katelyn Park with Claude Code, Groq, Gemini, Alpaca. This uses fake money for simulation purposes only. If you have any questions or comments, please reach out to <a href="mailto:katelyn_park@brown.edu">katelyn_park@brown.edu</a>.
+          </p>
         </div>
       )}
 
@@ -296,6 +300,18 @@ export default function AutoTrader() {
           </span>
         </div>
         <div className="at-card">
+          <span className="at-card-label">Total Stock</span>
+          <span className="at-card-value">
+            <RollingNumber value={money(account ? account.equity - account.cash : null)} flash={cardFlash.totalStock} />
+          </span>
+        </div>
+        <div className="at-card">
+          <span className="at-card-label">Cash</span>
+          <span className="at-card-value">
+            <RollingNumber value={money(account?.cash)} flash={cardFlash.cash} />
+          </span>
+        </div>
+        <div className="at-card">
           <span className="at-card-label">Today's P&L</span>
           <span className={`at-card-value ${account?.dayPL >= 0 ? 'pos' : 'neg'}`}>
             <RollingNumber
@@ -303,12 +319,6 @@ export default function AutoTrader() {
               flash={cardFlash.dayPL}
             />
             <small> {account ? pct(account.dayPLPct) : ''}</small>
-          </span>
-        </div>
-        <div className="at-card">
-          <span className="at-card-label">Cash</span>
-          <span className="at-card-value">
-            <RollingNumber value={money(account?.cash)} flash={cardFlash.cash} />
           </span>
         </div>
         <div className="at-card">
@@ -323,7 +333,74 @@ export default function AutoTrader() {
         </div>
       </div>
 
-      {/* Bot control */}
+      {/* Charts — candlestick + line side by side */}
+      <div className="at-panel" onClick={() => autoScroll && setAutoScroll(false)}>
+        <div className="at-charts-head">
+          <h2 className="at-panel-title">{candleSymbol} Charts</h2>
+          <button
+            className={`at-autoscroll-btn ${autoScroll ? 'active' : ''}`}
+            onClick={() => setAutoScroll(!autoScroll)}
+          >
+            {autoScroll ? '⏸ Pause' : '▶ Auto-scroll'}
+          </button>
+        </div>
+        <div className="at-candle-picker">
+          {trader.config.watchlist.map(s => (
+            <button key={s}
+              className={`at-candle-btn ${candleSymbol === s ? 'active' : ''}`}
+              onClick={() => handleTickerClick(s)}
+            >{s}</button>
+          ))}
+        </div>
+        <div className="at-charts-split">
+          <div className="at-chart-half">
+            <div className="at-chart-label-row">
+              <h3 className="at-chart-label">Candlestick</h3>
+              <div className="at-interval-picker">
+                {['1D', '1W', '1M', '3M', '1Y'].map(p => (
+                  <button key={p}
+                    className={`at-interval-btn ${candlePeriod === p ? 'active' : ''}`}
+                    onClick={() => setCandlePeriod(p)}
+                  >{p}</button>
+                ))}
+              </div>
+            </div>
+            {candleSymbol && <CandlestickChart symbol={candleSymbol} period={candlePeriod} />}
+          </div>
+          <div className="at-chart-half">
+            <div className="at-chart-label-row">
+              <h3 className="at-chart-label">Price</h3>
+              <div className="at-interval-picker">
+                {['1D', '1W', '1M', 'YTD', '1Y', '5Y', 'ALL'].map(p => (
+                  <button key={p}
+                    className={`at-interval-btn ${linePeriod === p ? 'active' : ''}`}
+                    onClick={() => setLinePeriod(p)}
+                  >{p}</button>
+                ))}
+              </div>
+            </div>
+            {lineData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={340}>
+                <LineChart data={lineData} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+                  <CartesianGrid stroke="#232634" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} minTickGap={40} />
+                  <YAxis domain={['auto', 'auto']} width={60} tick={{ fontSize: 11, fill: '#6b7280' }}
+                    tickFormatter={v => '$' + v.toFixed(0)} />
+                  <Tooltip
+                    contentStyle={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: 8, color: '#e2e8f0' }}
+                    formatter={(v) => ['$' + Number(v).toFixed(2), 'Price']} />
+                  <Line type="monotone" dataKey="price" stroke="#4f6ef7" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="at-empty">Loading…</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bot control — admin only */}
+      {isAdmin && (
       <div className="at-panel">
         <div className="at-bot-header">
           <div>
@@ -481,6 +558,7 @@ export default function AutoTrader() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Equity curve — hidden by default */}
       <div className="at-panel">
@@ -516,72 +594,6 @@ export default function AutoTrader() {
             )}
           </>
         )}
-      </div>
-
-      {/* Charts — candlestick + line side by side */}
-      <div className="at-panel">
-        <div className="at-charts-head">
-          <h2 className="at-panel-title">{candleSymbol} Charts</h2>
-          <button
-            className={`at-autoscroll-btn ${autoScroll ? 'active' : ''}`}
-            onClick={() => setAutoScroll(!autoScroll)}
-          >
-            {autoScroll ? '⏸ Pause' : '▶ Auto-scroll'}
-          </button>
-        </div>
-        <div className="at-candle-picker">
-          {trader.config.watchlist.map(s => (
-            <button key={s}
-              className={`at-candle-btn ${candleSymbol === s ? 'active' : ''}`}
-              onClick={() => handleTickerClick(s)}
-            >{s}</button>
-          ))}
-        </div>
-        <div className="at-charts-split">
-          <div className="at-chart-half">
-            <div className="at-chart-label-row">
-              <h3 className="at-chart-label">Candlestick</h3>
-              <div className="at-interval-picker">
-                {[['5m', '5 Min'], ['1h', '1 Hour']].map(([val, label]) => (
-                  <button key={val}
-                    className={`at-interval-btn ${candleInterval === val ? 'active' : ''}`}
-                    onClick={() => setCandleInterval(val)}
-                  >{label}</button>
-                ))}
-              </div>
-            </div>
-            {candleSymbol && <CandlestickChart symbol={candleSymbol} interval={candleInterval} />}
-          </div>
-          <div className="at-chart-half">
-            <div className="at-chart-label-row">
-              <h3 className="at-chart-label">Price</h3>
-              <div className="at-interval-picker">
-                {['1D', '1W', '1M', 'YTD', '1Y', '5Y', 'ALL'].map(p => (
-                  <button key={p}
-                    className={`at-interval-btn ${linePeriod === p ? 'active' : ''}`}
-                    onClick={() => setLinePeriod(p)}
-                  >{p}</button>
-                ))}
-              </div>
-            </div>
-            {lineData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={340}>
-                <LineChart data={lineData} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
-                  <CartesianGrid stroke="#232634" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} minTickGap={40} />
-                  <YAxis domain={['auto', 'auto']} width={60} tick={{ fontSize: 11, fill: '#6b7280' }}
-                    tickFormatter={v => '$' + v.toFixed(0)} />
-                  <Tooltip
-                    contentStyle={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: 8, color: '#e2e8f0' }}
-                    formatter={(v) => ['$' + Number(v).toFixed(2), 'Price']} />
-                  <Line type="monotone" dataKey="price" stroke="#4f6ef7" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="at-empty">Loading…</p>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="at-grid">

@@ -66,7 +66,7 @@ const DEFAULT_CONFIG = {
   watchlist: ['AAPL', 'NVDA', 'TSLA'],
   intervalMinutes: 15,
   perTradeDollars: 2000,   // dollars per buy order
-  maxPositionDollars: 10000, // max total exposure per symbol
+  maxPositionDollars: 60000, // max total exposure per symbol
   maxTradesPerDay: 10,     // hard cap on orders placed per day
   minConfidence: 0.6,      // ignore AI calls below this confidence
   stopLossPct: -3,         // auto-sell if position drops this % (negative number)
@@ -298,7 +298,8 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
     const currentExposure = position ? position.marketValue : 0;
     const room = config.maxPositionDollars - currentExposure;
     if (room <= 1) return { executed: false, note: 'at max position size for symbol' };
-    const size = Math.min(config.perTradeDollars, room, account.buyingPower * 0.95);
+    const tradeAmount = account.buyingPower * 0.6;
+    const size = Math.min(tradeAmount, room, account.buyingPower * 0.95);
     if (size < 1) return { executed: false, note: 'insufficient buying power' };
     await alpaca.createOrder({
       symbol: snap.symbol,

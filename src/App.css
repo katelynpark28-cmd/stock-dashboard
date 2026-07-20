@@ -720,7 +720,7 @@ body {
   font-size: 0.9rem;
 }
 
-.at-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.at-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 18px; }
 .at-card {
   background: #1a1d27;
   border: 1px solid #2d3148;
@@ -967,6 +967,9 @@ body {
 
 /* Scrolling ticker tape */
 .at-tape-wrap { overflow: hidden; background: #12141d; border-bottom: 1px solid #2d3148; padding: 10px 0; margin-bottom: 18px; border-radius: 10px; }
+.at-attribution { text-align: center; color: #6b7280; font-size: 0.75rem; margin: 8px 12px 2px; line-height: 1.4; }
+.at-attribution a { color: #4f6ef7; text-decoration: none; }
+.at-attribution a:hover { text-decoration: underline; }
 .at-tape { display: flex; gap: 40px; white-space: nowrap; animation: tape-scroll 30s linear infinite; width: max-content; }
 .at-tape:hover { animation-play-state: paused; }
 @keyframes tape-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }

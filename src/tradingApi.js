@@ -26,6 +26,6 @@ export const fetchOrders    = () => get('/api/alpaca/orders');
 export const fetchTrader    = () => get('/api/trader');
 export const saveTraderConfig = (patch) => post('/api/trader/config', patch);
 export const runTraderNow   = () => post('/api/trader/run', {});
-export const fetchCandles   = (symbol, interval = '1d') => get(`/api/trader/candles/${symbol}?interval=${interval}`);
+export const fetchCandles   = (symbol, interval = '1d', range) => get(`/api/trader/candles/${symbol}?interval=${interval}${range ? `&range=${range}` : ''}`);
 export const fetchAtrLevels = (symbols) => post('/api/trader/atr-levels', { symbols });
 export const fetchPrices    = (symbols) => post('/api/trader/prices', { symbols });

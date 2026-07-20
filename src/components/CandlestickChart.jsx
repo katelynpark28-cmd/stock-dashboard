@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchCandles } from '../tradingApi';
 
-export default function CandlestickChart({ symbol, interval = '1d' }) {
+const PERIOD_MAP = {
+  '1D': { interval: '5m', range: 2 },
+  '1W': { interval: '1h', range: 7 },
+  '1M': { interval: '1d', range: 35 },
+  '3M': { interval: '1d', range: 95 },
+  '1Y': { interval: '1wk', range: 400 },
+};
+
+export default function CandlestickChart({ symbol, period = '1D' }) {
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [tooltip, setTooltip] = useState(null);
@@ -9,9 +17,11 @@ export default function CandlestickChart({ symbol, interval = '1d' }) {
   const containerRef = useRef(null);
   const [width, setWidth] = useState(0);
 
+  const { interval, range } = PERIOD_MAP[period] || PERIOD_MAP['1D'];
+
   function load() {
     if (!symbol) return;
-    fetchCandles(symbol, interval)
+    fetchCandles(symbol, interval, range)
       .then(d => { setCandles(d); setLoading(false); setFadeKey(k => k + 1); })
       .catch(() => setLoading(false));
   }
@@ -22,7 +32,7 @@ export default function CandlestickChart({ symbol, interval = '1d' }) {
     load();
     const id = setInterval(load, 10000);
     return () => clearInterval(id);
-  }, [symbol, interval]);
+  }, [symbol, period]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -92,7 +102,7 @@ export default function CandlestickChart({ symbol, interval = '1d' }) {
             const x = xPos(i);
             return (
               <g key={i} className="cs-candle"
-                style={{ animationDelay: `${i * 40}ms` }}
+                style={{ animationDelay: `${i * Math.min(40, 1500 / candles.length)}ms` }}
                 onMouseEnter={() => setTooltip({ i, ...c, x, y: yScale(c.high) })}
                 onMouseLeave={() => setTooltip(null)}
               >

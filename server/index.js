@@ -21,6 +21,14 @@ process.on('uncaughtException', (err) => {
 
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
 
+// Simple in-memory cache to avoid Yahoo Finance rate limits (429s)
+const _cache = new Map();
+function cached(key, ttlMs, fn) {
+  const entry = _cache.get(key);
+  if (entry && Date.now() - entry.time < ttlMs) return Promise.resolve(entry.data);
+  return fn().then(data => { _cache.set(key, { data, time: Date.now() }); return data; });
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -49,7 +57,7 @@ app.get('/api/search', async (req, res) => {
 // Lightweight live quote for polling
 app.get('/api/quote/:symbol', async (req, res) => {
   try {
-    const q = await yahooFinance.quote(req.params.symbol);
+    const q = await cached(`quote:${req.params.symbol}`, 30000, () => yahooFinance.quote(req.params.symbol));
     res.json({
       price: q.regularMarketPrice,
       change: q.regularMarketChange,
@@ -68,8 +76,8 @@ app.get('/api/profile/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
     const [quote, summary] = await Promise.all([
-      yahooFinance.quote(symbol),
-      yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'financialData', 'defaultKeyStatistics'] }),
+      cached(`quote:${symbol}`, 30000, () => yahooFinance.quote(symbol)),
+      cached(`summary:${symbol}`, 300000, () => yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'financialData', 'defaultKeyStatistics'] })),
     ]);
     res.json({ quote, assetProfile: summary.assetProfile, financialData: summary.financialData, keyStats: summary.defaultKeyStatistics });
   } catch (e) {
@@ -119,7 +127,7 @@ app.get('/api/history/:symbol', async (req, res) => {
     else if (period === '5y')  period1 = new Date(now - 5 * 365 * 86400000);
     else                       period1 = new Date('1990-01-01');
 
-    const data = await yahooFinance.chart(symbol, { period1, period2: now, interval });
+    const data = await cached(`history:${symbol}:${period}:${interval}`, 60000, () => yahooFinance.chart(symbol, { period1, period2: now, interval }));
     res.json(data);
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -312,8 +320,8 @@ app.get('/api/market-overview', async (req, res) => {
     const results = await Promise.all(
       symbols.map(async (symbol) => {
         const [quote, history] = await Promise.all([
-          yahooFinance.quote(symbol),
-          yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '5m' }),
+          cached(`quote:${symbol}`, 30000, () => yahooFinance.quote(symbol)),
+          cached(`mktovw:${symbol}`, 60000, () => yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '5m' })),
         ]);
         return { symbol, quote, history };
       })
@@ -370,22 +378,37 @@ app.get('/api/trader/candles/:symbol', async (req, res) => {
   try {
     const symbol = req.params.symbol.toUpperCase();
     const interval = req.query.interval || '1d';
-    const rangeDays = interval === '1m' ? 1 : interval === '5m' ? 1 : interval === '15m' ? 10 : interval === '1h' ? 1 : 60;
+    const rangeDays = req.query.range ? +req.query.range : (interval === '1m' ? 2 : interval === '5m' ? 2 : interval === '15m' ? 10 : interval === '1h' ? 5 : interval === '1wk' ? 400 : 60);
     const period1 = new Date(Date.now() - rangeDays * 86400000);
-    const chart = await yahooFinance.chart(symbol, { period1, period2: new Date(), interval });
+    const chart = await cached(`candles:${symbol}:${interval}:${rangeDays}`, 60000, () => yahooFinance.chart(symbol, { period1, period2: new Date(), interval }));
     let quotes = (chart.quotes || [])
       .filter(q => q.open != null && q.close != null && q.high != null && q.low != null);
-    if (interval === '1m') {
-      const cutoff = new Date(Date.now() - 60 * 60 * 1000);
-      quotes = quotes.filter(q => new Date(q.date) >= cutoff);
-    } else if (interval === '5m') {
-      const cutoff = new Date(Date.now() - 6 * 60 * 60 * 1000);
-      quotes = quotes.filter(q => new Date(q.date) >= cutoff);
+    // Filter to market hours only (9:30 AM - 4:00 PM ET)
+    if (interval !== '1d' && interval !== '1wk' && interval !== '1mo') {
+      quotes = quotes.filter(q => {
+        const d = new Date(q.date);
+        // Convert to ET: UTC-4 (EDT) or UTC-5 (EST)
+        const jan = new Date(d.getFullYear(), 0, 1).getTimezoneOffset();
+        const jul = new Date(d.getFullYear(), 6, 1).getTimezoneOffset();
+        const isDST = d.getTimezoneOffset() < Math.max(jan, jul);
+        const etOffset = isDST ? -4 : -5;
+        const etH = (d.getUTCHours() + etOffset + 24) % 24;
+        const etM = d.getUTCMinutes();
+        const mins = etH * 60 + etM;
+        return mins >= 570 && mins < 960; // 9:30=570, 16:00=960
+      });
+    }
+    // For short intervals, show only the most recent trading session
+    if ((interval === '1m' || interval === '5m') && quotes.length > 0) {
+      const lastDate = new Date(quotes[quotes.length - 1].date).toDateString();
+      quotes = quotes.filter(q => new Date(q.date).toDateString() === lastDate);
     }
     const candles = quotes.map(q => ({
-        date: interval === '1d'
+        date: interval === '1d' || interval === '1wk' || interval === '1mo'
           ? new Date(q.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : new Date(q.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          : interval === '1h'
+            ? new Date(q.date).toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric' })
+            : new Date(q.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         open: +q.open.toFixed(2),
         high: +q.high.toFixed(2),
         low: +q.low.toFixed(2),
@@ -405,7 +428,7 @@ app.post('/api/trader/prices', async (req, res) => {
     if (!symbols.length) return res.json([]);
     const results = await Promise.all(symbols.map(async (sym) => {
       try {
-        const q = await yahooFinance.quote(sym);
+        const q = await cached(`quote:${sym}`, 30000, () => yahooFinance.quote(sym));
         return { symbol: sym, price: q.regularMarketPrice, change: q.regularMarketChangePercent };
       } catch { return { symbol: sym, price: null, change: null }; }
     }));
