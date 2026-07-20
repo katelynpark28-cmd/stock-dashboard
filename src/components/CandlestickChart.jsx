@@ -74,14 +74,12 @@ export default function CandlestickChart({ symbol, period = '1D' }) {
       {ready && (
         <svg width={width} height={height} className="cs-svg" key={fadeKey}>
           <defs>
-            <linearGradient id="glow-green" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4ade80" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#4ade80" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="glow-red" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f87171" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#f87171" stopOpacity="0" />
-            </linearGradient>
+            <filter id="glow-blur-green" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+            </filter>
+            <filter id="glow-blur-red" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+            </filter>
           </defs>
 
           {yTicks.map((v, i) => (
@@ -107,9 +105,10 @@ export default function CandlestickChart({ symbol, period = '1D' }) {
                 onMouseLeave={() => setTooltip(null)}
               >
                 <rect x={x - gap / 2} y={margin.top} width={gap} height={innerH} fill="transparent" />
-                {/* Glow behind candle */}
-                <rect x={x - candleW / 2 - 2} y={bodyTop - 4} width={candleW + 4} height={bodyH + 8}
-                  fill={up ? 'url(#glow-green)' : 'url(#glow-red)'} rx={3} opacity={0.6} />
+                {/* Soft glow behind candle */}
+                <ellipse cx={x} cy={bodyTop + bodyH / 2} rx={candleW / 2 + 4} ry={bodyH / 2 + 6}
+                  fill={up ? '#4ade80' : '#f87171'} opacity={0.35}
+                  filter={up ? 'url(#glow-blur-green)' : 'url(#glow-blur-red)'} />
                 {/* Wick */}
                 <line x1={x} x2={x} y1={yScale(c.high)} y2={yScale(c.low)} stroke={color} strokeWidth={1.5} />
                 {/* Body */}
