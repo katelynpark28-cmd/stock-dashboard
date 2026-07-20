@@ -353,8 +353,7 @@ export default function AutoTrader() {
         <div className="at-charts-split">
           <div className="at-chart-half">
             <div className="at-chart-label-row">
-              <h3 className="at-chart-label">Candlestick</h3>
-              <button className="at-patterns-btn" onClick={() => setShowPatterns(true)} title="Candlestick patterns guide">?</button>
+              <h3 className="at-chart-label">Candlestick <button className="at-patterns-btn" onClick={() => setShowPatterns(true)} title="Candlestick patterns guide">?</button></h3>
               <div className="at-interval-picker">
                 {['1D', '1W', '1M', '3M', '1Y'].map(p => (
                   <button key={p}

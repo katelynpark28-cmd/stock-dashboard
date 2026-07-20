@@ -1020,8 +1020,8 @@ body {
 .at-equity-head .at-panel-title { margin-bottom: 0; }
 
 /* Patterns guide button */
-.at-patterns-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid #3d4260; background: transparent; color: #6b7280; font-size: 0.75rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: -4px; }
-.at-patterns-btn:hover { border-color: #4f6ef7; color: #8da2fb; background: rgba(79,110,247,0.1); }
+.at-patterns-btn { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #4f6ef7; background: rgba(79,110,247,0.1); color: #8da2fb; font-size: 0.7rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: 6px; vertical-align: middle; }
+.at-patterns-btn:hover { border-color: #8da2fb; color: #e2e8f0; background: rgba(79,110,247,0.2); }
 
 /* Patterns modal */
 .at-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); animation: fadeIn 0.15s ease-out; }
