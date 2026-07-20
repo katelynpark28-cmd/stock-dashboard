@@ -387,15 +387,10 @@ app.get('/api/trader/candles/:symbol', async (req, res) => {
     if (interval !== '1d' && interval !== '1wk' && interval !== '1mo') {
       quotes = quotes.filter(q => {
         const d = new Date(q.date);
-        // Convert to ET: UTC-4 (EDT) or UTC-5 (EST)
-        const jan = new Date(d.getFullYear(), 0, 1).getTimezoneOffset();
-        const jul = new Date(d.getFullYear(), 6, 1).getTimezoneOffset();
-        const isDST = d.getTimezoneOffset() < Math.max(jan, jul);
-        const etOffset = isDST ? -4 : -5;
-        const etH = (d.getUTCHours() + etOffset + 24) % 24;
-        const etM = d.getUTCMinutes();
-        const mins = etH * 60 + etM;
-        return mins >= 570 && mins < 960; // 9:30=570, 16:00=960
+        const etTime = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: 'numeric', hour12: false }).format(d);
+        const [h, m] = etTime.split(':').map(Number);
+        const mins = h * 60 + m;
+        return mins >= 570 && mins < 960;
       });
     }
     // For short intervals, show only the most recent trading session
@@ -405,10 +400,10 @@ app.get('/api/trader/candles/:symbol', async (req, res) => {
     }
     const candles = quotes.map(q => ({
         date: interval === '1d' || interval === '1wk' || interval === '1mo'
-          ? new Date(q.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          ? new Date(q.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
           : interval === '1h'
-            ? new Date(q.date).toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric' })
-            : new Date(q.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+            ? new Date(q.date).toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', timeZone: 'America/New_York' })
+            : new Date(q.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }),
         open: +q.open.toFixed(2),
         high: +q.high.toFixed(2),
         low: +q.low.toFixed(2),
@@ -421,15 +416,27 @@ app.get('/api/trader/candles/:symbol', async (req, res) => {
   }
 });
 
-// Live prices for ticker tape
+// Live prices for ticker tape (uses chart() instead of quote() to avoid crumb/429 issues)
 app.post('/api/trader/prices', async (req, res) => {
   try {
     const symbols = req.body.symbols || [];
     if (!symbols.length) return res.json([]);
     const results = await Promise.all(symbols.map(async (sym) => {
       try {
-        const q = await cached(`quote:${sym}`, 30000, () => yahooFinance.quote(sym));
-        return { symbol: sym, price: q.regularMarketPrice, change: q.regularMarketChangePercent };
+        const chart = await cached(`pricechart:${sym}`, 30000, () =>
+          yahooFinance.chart(sym, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
+        );
+        const meta = chart.meta || {};
+        const price = meta.regularMarketPrice;
+        const prev = meta.chartPreviousClose || meta.previousClose;
+        if (price != null && prev != null && prev > 0) {
+          return { symbol: sym, price, change: ((price - prev) / prev) * 100 };
+        }
+        const quotes = (chart.quotes || []).filter(q => q.close != null);
+        if (!quotes.length) return { symbol: sym, price: null, change: null };
+        const last = quotes[quotes.length - 1];
+        const prevQ = quotes.length > 1 ? quotes[quotes.length - 2] : null;
+        return { symbol: sym, price: last.close, change: prevQ ? ((last.close - prevQ.close) / prevQ.close) * 100 : null };
       } catch { return { symbol: sym, price: null, change: null }; }
     }));
     res.json(results);
