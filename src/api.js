@@ -170,16 +170,21 @@ export async function fetchMarketOverview(symbols) {
 }
 
 export async function fetchPriceHistory(ticker, period) {
-  const intervalMap = { '1D': '5m', '1W': '15m', '1M': '1d', 'YTD': '1d', '1Y': '1wk', '5Y': '1mo', 'ALL': '1mo' };
+  const intervalMap = { '1D': '5m', '1W': '1h', '1M': '1d', 'YTD': '1d', '1Y': '1wk', '5Y': '1mo', 'ALL': '1mo' };
   const periodMap   = { '1D': '1d', '1W': '1w',  '1M': '1mo','YTD': 'ytd','1Y': '1y',  '5Y': '5y',  'ALL': 'all'  };
   const data = await get(`/api/history/${ticker.toUpperCase()}?period=${periodMap[period] || '5y'}&interval=${intervalMap[period] || '1mo'}`);
   const showYear = period === '5Y' || period === 'ALL';
   return (data.quotes || []).map(q => {
     const price = q.close ?? q.adjclose;
     const d = new Date(q.date);
-    const date = period === '1D'
-      ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(showYear ? { year: '2-digit' } : {}) });
+    let date;
+    if (period === '1D') {
+      date = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    } else if (period === '1W') {
+      date = d.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric' });
+    } else {
+      date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(showYear ? { year: '2-digit' } : {}) });
+    }
     return {
       date,
       value: price != null ? parseFloat(price.toFixed(2)) : null,
