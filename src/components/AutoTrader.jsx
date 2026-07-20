@@ -269,9 +269,6 @@ export default function AutoTrader() {
               </span>
             ))}
           </div>
-          <p className="at-attribution">
-            This tool is built by Katelyn Park with Claude Code, Groq, Gemini, Alpaca. This uses fake money for simulation purposes only. If you have any questions or comments, please reach out to <a href="mailto:katelyn_park@brown.edu">katelyn_park@brown.edu</a>.
-          </p>
         </div>
       )}
 
