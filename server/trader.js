@@ -8,7 +8,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { alpaca } from './alpaca.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = path.join(__dirname, 'trader-state.json');
+// DATA_DIR points at a Render persistent disk mount in production, so bot
+// state survives instance restarts/spin-downs instead of resetting to
+// whatever was last committed to git. Falls back to this folder for local dev.
+const STATE_FILE = path.join(process.env.DATA_DIR || __dirname, 'trader-state.json');
+if (process.env.DATA_DIR) fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
 
