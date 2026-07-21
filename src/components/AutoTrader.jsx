@@ -649,17 +649,22 @@ export default function AutoTrader() {
             <p className="at-empty">No orders yet.</p>
           ) : (
             <table className="at-table">
-              <thead><tr><th>Symbol</th><th>Side</th><th>Qty/$</th><th>Status</th><th>Fill</th></tr></thead>
+              <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Value</th><th>Status</th><th>Fill</th></tr></thead>
               <tbody>
-                {orders.map(o => (
-                  <tr key={o.id}>
-                    <td className="at-sym">{o.symbol}</td>
-                    <td className={o.side === 'buy' ? 'pos' : 'neg'}>{o.side}</td>
-                    <td>{o.notional ? money(o.notional) : o.qty}</td>
-                    <td>{o.status}</td>
-                    <td>{o.filledAvgPrice ? money(o.filledAvgPrice) : '—'}</td>
-                  </tr>
-                ))}
+                {orders.map(o => {
+                  const qty = o.filledQty || o.qty;
+                  const value = o.notional ?? (o.filledQty && o.filledAvgPrice ? o.filledQty * o.filledAvgPrice : null);
+                  return (
+                    <tr key={o.id}>
+                      <td className="at-sym">{o.symbol}</td>
+                      <td className={o.side === 'buy' ? 'pos' : 'neg'}>{o.side}</td>
+                      <td>{qty || '—'}</td>
+                      <td>{value != null ? money(value) : '—'}</td>
+                      <td>{o.status}</td>
+                      <td>{o.filledAvgPrice ? money(o.filledAvgPrice) : '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
