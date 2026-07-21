@@ -279,37 +279,46 @@ function scoreStable(q) {
   return (1 / (volatility + 0.01)) * divBonus;
 }
 
+// FMP quote data doesn't need Yahoo's crumb token, so it isn't 429'd on Render.
+// The free-tier key doesn't support batched multi-symbol requests, so each
+// symbol is fetched (and cached) individually; both screener modes share the
+// same per-symbol cache.
+async function fetchFmpQuote(symbol) {
+  const key = process.env.VITE_FMP_API_KEY;
+  if (!key) throw new Error('FMP API key missing');
+  const url = `https://financialmodelingprep.com/stable/quote?symbol=${symbol}&apikey=${key}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`FMP error ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data) || !data.length) throw new Error('FMP returned no data');
+  return data[0];
+}
+
 app.get('/api/screener', async (req, res) => {
   try {
     const { mode = 'stable' } = req.query;
     const universe = mode === 'growth' ? GROWTH_UNIVERSE : STABLE_UNIVERSE;
 
-    const quotes = await Promise.all(
-      universe.map(s => cached(`screenerfund:${s}`, 300000, () =>
-        yahooFinance.quoteSummary(s, { modules: ['price', 'summaryDetail', 'defaultKeyStatistics'] })
-          .then(d => {
-            const price = d.price || {};
-            const detail = d.summaryDetail || {};
-            const stats = d.defaultKeyStatistics || {};
-            return {
-              symbol: s,
-              shortName: price.shortName || s,
-              longName: price.longName || price.shortName || s,
-              regularMarketPrice: price.regularMarketPrice ?? null,
-              regularMarketChangePercent: price.regularMarketChangePercent ?? null,
-              fiftyTwoWeekHigh: detail.fiftyTwoWeekHigh ?? null,
-              fiftyTwoWeekLow: detail.fiftyTwoWeekLow ?? null,
-              epsTrailingTwelveMonths: stats.trailingEps ?? null,
-              epsForward: stats.forwardEps ?? null,
-              beta: detail.beta ?? null,
-              trailingPE: detail.trailingPE ?? null,
-              forwardPE: detail.forwardPE ?? null,
-              marketCap: price.marketCap ?? detail.marketCap ?? null,
-              dividendYield: detail.dividendYield ?? null,
-            };
-          })
-      ).catch(() => null))
-    );
+    const quotes = await Promise.all(universe.map(async s => {
+      const q = await cached(`fmpquote:${s}`, 600000, () => fetchFmpQuote(s)).catch(() => null);
+      if (!q) return null;
+      return {
+        symbol: s,
+        shortName: q.name || s,
+        longName: q.name || s,
+        regularMarketPrice: q.price ?? null,
+        regularMarketChangePercent: q.changePercentage ?? null,
+        fiftyTwoWeekHigh: q.yearHigh ?? null,
+        fiftyTwoWeekLow: q.yearLow ?? null,
+        epsTrailingTwelveMonths: q.eps ?? null,
+        epsForward: null,
+        beta: null,
+        trailingPE: q.pe ?? null,
+        forwardPE: null,
+        marketCap: q.marketCap ?? null,
+        dividendYield: null,
+      };
+    }));
     const valid = quotes.filter(q => q && q.regularMarketPrice > 0);
 
     const scored = valid
@@ -339,7 +348,7 @@ app.get('/api/screener', async (req, res) => {
         temperature: 0.4,
       });
       reasons = JSON.parse(completion.choices[0].message.content).reasons || {};
-    } catch (_) { /* reasons stay empty if AI fails */ }
+    } catch (e) { console.error('screener reasons failed:', e.message); }
 
     res.json(scored.map(q => ({
       symbol: q.symbol,

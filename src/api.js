@@ -143,6 +143,7 @@ export async function fetchScreener(mode) {
 }
 
 export async function fetchMarketOverview(symbols) {
+  if (symbols && symbols.length === 0) return [];
   const query = symbols ? `?symbols=${symbols.join(',')}` : '';
   const data = await get(`/api/market-overview${query}`);
   return data.map(({ symbol, quote, history }) => {
