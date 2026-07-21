@@ -609,8 +609,8 @@ app.get('/api/trader', (req, res) => {
   res.json(trader.getState());
 });
 
-app.post('/api/trader/config', (req, res) => {
-  try { res.json(trader.setConfig(req.body || {})); }
+app.post('/api/trader/config', async (req, res) => {
+  try { res.json(await trader.setConfig(req.body || {})); }
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -628,7 +628,7 @@ app.get('{*path}', (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API server running on http://localhost:${PORT}`);
-  trader.init();
+  await trader.init();
 });

@@ -8,11 +8,31 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { alpaca } from './alpaca.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// DATA_DIR points at a Render persistent disk mount in production, so bot
-// state survives instance restarts/spin-downs instead of resetting to
-// whatever was last committed to git. Falls back to this folder for local dev.
-const STATE_FILE = path.join(process.env.DATA_DIR || __dirname, 'trader-state.json');
-if (process.env.DATA_DIR) fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
+const STATE_FILE = path.join(__dirname, 'trader-state.json');
+
+// Bot state (watchlist, ATR overrides, on/off, trade log) persists to a free
+// Upstash Redis database when configured, so it survives Render's ephemeral
+// disk resetting on every instance spin-down/redeploy. Falls back to the
+// local JSON file for local dev where these env vars aren't set.
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_KEY = 'stockp:trader-state';
+
+async function redisGetState() {
+  const res = await fetch(`${REDIS_URL}/get/${REDIS_KEY}`, {
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+  });
+  const data = await res.json();
+  return data.result ? JSON.parse(data.result) : null;
+}
+
+async function redisSetState(value) {
+  await fetch(`${REDIS_URL}/set/${REDIS_KEY}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'text/plain' },
+    body: JSON.stringify(value),
+  });
+}
 
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
 
@@ -123,39 +143,47 @@ function seededShuffle(arr, seedStr) {
   return a;
 }
 
-function rotateWatchlistIfNeeded() {
+async function rotateWatchlistIfNeeded() {
   const todayStr = today();
   if (state.watchlistDate === todayStr) return;
   state.config.watchlist = seededShuffle(WATCHLIST_UNIVERSE, todayStr).slice(0, WATCHLIST_SIZE);
   state.watchlistDate = todayStr;
-  saveState();
+  await saveState();
 }
 
-function loadState() {
+async function loadState() {
   try {
-    const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const raw = REDIS_URL && REDIS_TOKEN
+      ? await redisGetState()
+      : JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    if (!raw) return;
     state.config = { ...DEFAULT_CONFIG, ...(raw.config || {}) };
     state.log = raw.log || [];
     state.trades = raw.trades && raw.trades.date === today() ? raw.trades : { date: today(), count: 0 };
     state.equityHistory = raw.equityHistory || [];
     state.watchlistDate = raw.watchlistDate || null;
-  } catch {
-    // first run — no state file yet
+  } catch (e) {
+    console.error('Failed to load trader state (first run is normal):', e.message);
   }
 }
 
-function saveState() {
+async function saveState() {
+  const payload = { config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate };
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate }, null, 2));
+    if (REDIS_URL && REDIS_TOKEN) {
+      await redisSetState(payload);
+    } else {
+      fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2));
+    }
   } catch (e) {
     console.error('Failed to save trader state:', e.message);
   }
 }
 
-function addLog(entry) {
+async function addLog(entry) {
   state.log.unshift({ time: new Date().toISOString(), ...entry });
   state.log = state.log.slice(0, 200);
-  saveState();
+  await saveState();
 }
 
 // --- Technical indicators ----------------------------------------------------
@@ -383,7 +411,7 @@ async function runOnce(manual = false) {
   if (state.running) return;
   state.running = true;
   try {
-    rotateWatchlistIfNeeded();
+    await rotateWatchlistIfNeeded();
     // Reset daily counter on date rollover
     if (state.trades.date !== today()) state.trades = { date: today(), count: 0 };
 
@@ -428,9 +456,9 @@ async function runOnce(manual = false) {
           try {
             await alpaca.createOrder({ symbol: pos.symbol, qty: pos.qty, side: 'sell', type: 'market', time_in_force: 'day' });
             state.trades.count++;
-            addLog({ symbol: pos.symbol, action: 'sell', confidence: 1, reason: exitReason, engine: 'Exit', price: pos.current, rsi14: null, executed: true, note: `sold ${pos.qty} shares` });
+            await addLog({ symbol: pos.symbol, action: 'sell', confidence: 1, reason: exitReason, engine: 'Exit', price: pos.current, rsi14: null, executed: true, note: `sold ${pos.qty} shares` });
           } catch (e) {
-            addLog({ symbol: pos.symbol, action: 'error', confidence: 0, reason: `exit failed: ${e.message}`, engine: 'Exit', executed: false, note: 'error' });
+            await addLog({ symbol: pos.symbol, action: 'error', confidence: 0, reason: `exit failed: ${e.message}`, engine: 'Exit', executed: false, note: 'error' });
           }
         }
       }
@@ -447,7 +475,7 @@ async function runOnce(manual = false) {
         } else {
           result = { executed: false, note: 'market closed — not trading' };
         }
-        addLog({
+        await addLog({
           symbol,
           action: decision.action,
           confidence: decision.confidence,
@@ -459,7 +487,7 @@ async function runOnce(manual = false) {
           note: result.note,
         });
       } catch (e) {
-        addLog({ symbol, action: 'error', confidence: 0, reason: e.message, executed: false, note: 'error' });
+        await addLog({ symbol, action: 'error', confidence: 0, reason: e.message, executed: false, note: 'error' });
       }
     }
     state.lastRun = new Date().toISOString();
@@ -487,9 +515,9 @@ function scheduleLoop() {
 
 // --- Public API --------------------------------------------------------------
 export const trader = {
-  init() {
-    loadState();
-    rotateWatchlistIfNeeded();
+  async init() {
+    await loadState();
+    await rotateWatchlistIfNeeded();
     scheduleLoop();
   },
   getState() {
@@ -503,13 +531,13 @@ export const trader = {
       equityHistory: state.equityHistory,
     };
   },
-  setConfig(patch) {
+  async setConfig(patch) {
     state.config = { ...state.config, ...patch };
     // sanitize
     state.config.watchlist = (state.config.watchlist || [])
       .map(s => String(s).trim().toUpperCase()).filter(Boolean).slice(0, 20);
     state.config.intervalMinutes = Math.max(1, Math.min(240, +state.config.intervalMinutes || 15));
-    saveState();
+    await saveState();
     scheduleLoop();
     return this.getState();
   },
