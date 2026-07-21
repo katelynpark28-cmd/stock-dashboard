@@ -254,29 +254,54 @@ const STABLE_UNIVERSE = [
 ];
 
 function scoreGrowth(q) {
-  if (!q.fiftyTwoWeekHigh || !q.fiftyTwoWeekLow) return 0;
+  if (q.recentVolatility == null) return 0;
   // Filter out crashed stocks — must be within 35% of 52-week high
-  const momentum = q.regularMarketPrice / q.fiftyTwoWeekHigh;
+  const momentum = q.fiftyTwoWeekHigh ? q.regularMarketPrice / q.fiftyTwoWeekHigh : 1;
   if (momentum < 0.65) return 0;
   // Filter out stocks with negative forward EPS
   if (q.epsForward != null && q.epsForward < 0) return 0;
-  // Volatility: how wide was the 52w range
-  const volatility = (q.fiftyTwoWeekHigh - q.fiftyTwoWeekLow) / q.fiftyTwoWeekLow;
   // EPS growth bonus: forward EPS > trailing EPS
   const epsGrowth = (q.epsForward > 0 && q.epsTrailingTwelveMonths > 0 && q.epsForward > q.epsTrailingTwelveMonths) ? 1.4 : 1.0;
-  return volatility * momentum * epsGrowth;
+  return q.recentVolatility * momentum * epsGrowth;
 }
 
 function scoreStable(q) {
   if (!q.marketCap || q.marketCap < 50e9) return 0;
-  if (!q.fiftyTwoWeekHigh || !q.fiftyTwoWeekLow) return 0;
+  if (q.recentVolatility == null) return 0;
   // Must have positive trailing EPS
   if (q.epsTrailingTwelveMonths != null && q.epsTrailingTwelveMonths <= 0) return 0;
-  const volatility = (q.fiftyTwoWeekHigh - q.fiftyTwoWeekLow) / q.fiftyTwoWeekLow;
   // Reward dividend payers
   const divBonus = q.dividendYield > 0 ? 1.3 : 1.0;
-  // Lower volatility = higher score (invert)
-  return (1 / (volatility + 0.01)) * divBonus;
+  // Lower recent volatility = higher score (invert)
+  return (1 / (q.recentVolatility + 1)) * divBonus;
+}
+
+// Realized volatility over the trailing ~20 trading days (annualized stddev
+// of daily log returns), as a percentage. This measures whether a stock is
+// ACTUALLY swinging right now — unlike the 52-week high/low range, which
+// stays "wide" forever after a single one-off spike even if the stock has
+// been flat for months since.
+function annualizedRecentVolatility(closes) {
+  const window = closes.slice(-21); // ~20 return observations
+  if (window.length < 6) return null;
+  const returns = [];
+  for (let i = 1; i < window.length; i++) {
+    if (window[i - 1] > 0 && window[i] > 0) returns.push(Math.log(window[i] / window[i - 1]));
+  }
+  if (returns.length < 5) return null;
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / returns.length;
+  return Math.sqrt(variance) * Math.sqrt(252) * 100;
+}
+
+async function fetchRecentVolatility(symbol) {
+  const chart = await yahooFinance.chart(symbol, {
+    period1: new Date(Date.now() - 45 * 86400000),
+    period2: new Date(),
+    interval: '1d',
+  });
+  const closes = (chart.quotes || []).map(q => q.close).filter(c => c != null && c > 0);
+  return annualizedRecentVolatility(closes);
 }
 
 // FMP quote data doesn't need Yahoo's crumb token, so it isn't 429'd on Render.
@@ -300,7 +325,10 @@ app.get('/api/screener', async (req, res) => {
     const universe = mode === 'growth' ? GROWTH_UNIVERSE : STABLE_UNIVERSE;
 
     const quotes = await Promise.all(universe.map(async s => {
-      const q = await cached(`fmpquote:${s}`, 600000, () => fetchFmpQuote(s)).catch(() => null);
+      const [q, recentVolatility] = await Promise.all([
+        cached(`fmpquote:${s}`, 3600000, () => fetchFmpQuote(s)).catch(() => null),
+        cached(`recentvol:${s}`, 3600000, () => fetchRecentVolatility(s)).catch(() => null),
+      ]);
       if (!q) return null;
       return {
         symbol: s,
@@ -317,6 +345,7 @@ app.get('/api/screener', async (req, res) => {
         forwardPE: null,
         marketCap: q.marketCap ?? null,
         dividendYield: null,
+        recentVolatility,
       };
     }));
     const valid = quotes.filter(q => q && q.regularMarketPrice > 0);
@@ -354,7 +383,7 @@ app.get('/api/screener', async (req, res) => {
       symbol: q.symbol,
       name: q.longName || q.shortName,
       beta: q.beta,
-      rangeScore: +( (q.fiftyTwoWeekHigh - q.fiftyTwoWeekLow) / q.fiftyTwoWeekLow * 100 ).toFixed(1),
+      rangeScore: q.recentVolatility != null ? +q.recentVolatility.toFixed(1) : null,
       high52w: q.fiftyTwoWeekHigh,
       low52w: q.fiftyTwoWeekLow,
       dividendYield: q.dividendYield,

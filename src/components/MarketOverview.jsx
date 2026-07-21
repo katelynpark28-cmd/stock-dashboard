@@ -6,12 +6,12 @@ const PROFILES = {
   growth: {
     label: 'High Growth & Volatile',
     icon: '⚡',
-    description: 'Ranked by 52-week price range — stocks that have swung the most over the past year. High upside potential, high drawdown risk.',
+    description: 'Ranked by trailing 30-day realized volatility — stocks actually swinging right now, not just ones that had a big move sometime in the past year. High upside potential, high drawdown risk.',
   },
   stable: {
     label: 'Long-term & Reliable',
     icon: '🏛️',
-    description: 'Ranked by smallest 52-week range among established companies — the steadiest movers with durable earnings and wide moats.',
+    description: 'Ranked by lowest trailing 30-day realized volatility among established companies — the steadiest movers right now, with durable earnings and wide moats.',
   },
 };
 
@@ -117,7 +117,7 @@ export default function MarketOverview({ onSearch }) {
                 <MiniChart data={s.chartData} up={up} />
                 <div className="ov-meta">
                   <span>Mkt Cap {fmtCap(s.mktCap)}</span>
-                  {s.rangeScore != null && <span className={profile === 'growth' ? 'up' : ''}>52w swing {s.rangeScore}%</span>}
+                  {s.rangeScore != null && <span className={profile === 'growth' ? 'up' : ''}>30d volatility {s.rangeScore}%</span>}
                   {s.beta != null && <span>β {s.beta.toFixed(2)}</span>}
                   {s.dividendYield != null && s.dividendYield > 0 && <span>Div {(s.dividendYield * 100).toFixed(1)}%</span>}
                 </div>
