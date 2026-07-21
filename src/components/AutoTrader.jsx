@@ -20,6 +20,10 @@ const timeAgo = (iso) => {
 
 export default function AutoTrader() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginKey, setLoginKey] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -51,18 +55,30 @@ export default function AutoTrader() {
   const [form, setForm] = useState(null);
   const loadedForm = useRef(false);
 
-  useEffect(() => {
-    const key = new URLSearchParams(window.location.search).get('admin');
-    if (!key) return;
-    fetch('/api/auth/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key }),
-    })
-      .then(r => r.json())
-      .then(d => setIsAdmin(!!d.admin))
-      .catch(() => {});
-  }, []);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginKey.trim()) return;
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const r = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: loginKey.trim() }),
+      });
+      const d = await r.json();
+      if (d.admin) {
+        setIsAdmin(true);
+        setShowLogin(false);
+        setLoginKey('');
+      } else {
+        setLoginError('Invalid key');
+      }
+    } catch {
+      setLoginError('Connection error');
+    }
+    setLoginLoading(false);
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -416,6 +432,15 @@ export default function AutoTrader() {
           <div>
             <div className="at-bot-title">
               Bot is <span className={enabled ? 'on' : 'off'}>{enabled ? 'ON' : 'OFF'}</span>
+              {!isAdmin && (
+                <button className="at-lock-btn" onClick={() => setShowLogin(true)} title="Admin login">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </button>
+              )}
+              {isAdmin && <span className="at-admin-badge">Admin</span>}
             </div>
             <div className="at-bot-sub">
               Last run {timeAgo(trader.lastRun)}{trader.lastRunNote ? ` · ${trader.lastRunNote}` : ''} ·
@@ -738,6 +763,36 @@ export default function AutoTrader() {
           </div>
         ))}
       </div>
+
+      {showLogin && (
+        <div className="at-modal-overlay" onClick={() => setShowLogin(false)}>
+          <div className="at-login-modal" onClick={e => e.stopPropagation()}>
+            <button className="at-modal-close" onClick={() => { setShowLogin(false); setLoginError(''); setLoginKey(''); }}>&times;</button>
+            <div className="at-login-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4f6ef7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+            <h3>Admin Access</h3>
+            <p>Enter your admin key to manage the bot.</p>
+            <form onSubmit={handleLogin}>
+              <input
+                type="password"
+                className="at-login-input"
+                placeholder="Admin key"
+                value={loginKey}
+                onChange={e => { setLoginKey(e.target.value); setLoginError(''); }}
+                autoFocus
+              />
+              {loginError && <div className="at-login-error">{loginError}</div>}
+              <button type="submit" className="at-login-submit" disabled={loginLoading || !loginKey.trim()}>
+                {loginLoading ? 'Verifying…' : 'Unlock'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showPatterns && (
         <div className="at-modal-overlay" onClick={() => setShowPatterns(false)}>

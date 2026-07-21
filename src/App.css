@@ -1034,6 +1034,26 @@ body {
 .at-modal-header h3 { margin: 0; font-size: 1rem; color: #e2e8f0; }
 .at-modal-close { background: none; border: none; color: #6b7280; font-size: 1.5rem; cursor: pointer; padding: 0 4px; line-height: 1; }
 .at-modal-close:hover { color: #e2e8f0; }
+
+/* Lock button & admin badge */
+.at-lock-btn { background: rgba(79,110,247,0.1); border: 1px solid #4f6ef7; color: #8da2fb; border-radius: 6px; padding: 4px 8px; cursor: pointer; margin-left: 10px; vertical-align: middle; display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; transition: all 0.2s; }
+.at-lock-btn:hover { background: rgba(79,110,247,0.25); color: #aab8fc; }
+.at-admin-badge { background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.4); color: #34d399; font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: 10px; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Login modal */
+.at-login-modal { background: #1a1d27; border: 1px solid #2d3148; border-radius: 16px; padding: 32px 28px 28px; width: 340px; max-width: 90vw; text-align: center; position: relative; animation: fadeIn 0.15s ease-out; }
+.at-login-modal h3 { color: #e2e8f0; font-size: 1.1rem; margin: 12px 0 6px; }
+.at-login-modal p { color: #6b7280; font-size: 0.8rem; margin: 0 0 18px; }
+.at-login-modal .at-modal-close { position: absolute; top: 10px; right: 12px; }
+.at-login-icon { display: flex; justify-content: center; }
+.at-login-input { width: 100%; padding: 10px 14px; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; color: #e2e8f0; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+.at-login-input:focus { border-color: #4f6ef7; }
+.at-login-input::placeholder { color: #4b5563; }
+.at-login-error { color: #f87171; font-size: 0.75rem; margin-top: 8px; }
+.at-login-submit { width: 100%; padding: 10px; margin-top: 14px; background: #4f6ef7; border: none; border-radius: 8px; color: #fff; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.at-login-submit:hover:not(:disabled) { background: #6381f8; }
+.at-login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .at-modal-body { padding: 18px 22px 24px; }
 .at-pattern-section { margin-bottom: 20px; }
 .at-pattern-section:last-child { margin-bottom: 0; }
