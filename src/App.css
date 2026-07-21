@@ -744,10 +744,6 @@ body {
   margin-bottom: 18px;
 }
 .at-panel-title { color: #e2e8f0; font-size: 1.05rem; margin-bottom: 14px; }
-.at-eq-legend { display: flex; gap: 18px; margin: -8px 0 10px; font-size: 0.82rem; color: #9ca3af; }
-.at-eq-legend-item { display: flex; align-items: center; gap: 6px; }
-.at-eq-swatch { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
-.at-eq-swatch-dash { background: repeating-linear-gradient(90deg, #f59e0b 0 6px, transparent 6px 9px) !important; }
 .at-overrides { margin-top: 18px; border-top: 1px solid #2d3148; padding-top: 16px; }
 .at-overrides-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
 .at-overrides-title { color: #e2e8f0; font-size: 0.95rem; margin-bottom: 4px; }
@@ -1037,10 +1033,6 @@ body {
 .at-autoscroll-btn:hover { border-color: #4f6ef7; color: #e2e8f0; }
 .at-autoscroll-btn.active { background: rgba(79,110,247,0.15); border-color: #4f6ef7; color: #8da2fb; }
 
-/* Equity curve head with show/hide */
-.at-equity-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.at-equity-head .at-panel-title { margin-bottom: 0; }
-
 /* Patterns guide button */
 .at-patterns-btn { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #4f6ef7; background: rgba(79,110,247,0.1); color: #8da2fb; font-size: 0.65rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: 6px; flex-shrink: 0; }
 .at-patterns-btn:hover { border-color: #8da2fb; color: #e2e8f0; background: rgba(79,110,247,0.2); }
@@ -1083,6 +1075,6 @@ body {
 .at-pattern-heading.neutral { color: #6b7280; }
 .at-pattern-grid { display: flex; flex-direction: column; gap: 12px; }
 .at-pattern-card { display: flex; gap: 14px; align-items: flex-start; background: #1a1d27; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 16px; }
-.at-pattern-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; min-width: 50px; }
+.at-pattern-icon { flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; }
 .at-pattern-info strong { color: #e2e8f0; font-size: 0.85rem; display: block; margin-bottom: 4px; }
 .at-pattern-info p { color: #9ca3af; font-size: 0.78rem; line-height: 1.5; margin: 0; }

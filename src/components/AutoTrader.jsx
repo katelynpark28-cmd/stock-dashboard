@@ -35,7 +35,6 @@ export default function AutoTrader() {
   const [logVisible, setLogVisible] = useState(true);
   const [candleSymbol, setCandleSymbol] = useState('');
   const [newTicker, setNewTicker] = useState('');
-  const [equityVisible, setEquityVisible] = useState(false);
   const [candlePeriod, setCandlePeriod] = useState('1D');
   const [linePeriod, setLinePeriod] = useState('1M');
   const [showPatterns, setShowPatterns] = useState(false);
@@ -300,22 +299,6 @@ export default function AutoTrader() {
     return true;
   });
 
-  const equityData = (() => {
-    const hist = trader.equityHistory || [];
-    if (hist.length === 0) return [];
-    const firstEquity = hist[0].equity;
-    const firstSpy = hist.find(p => p.spy != null)?.spy;
-    return hist.map(p => {
-      const row = {
-        t: new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        equity: p.equity,
-      };
-      if (firstSpy && p.spy != null) {
-        row.spy = (p.spy / firstSpy) * firstEquity;
-      }
-      return row;
-    });
-  })();
   const journal = trader.log.filter(d => d.executed);
 
   // Duplicate tape items for seamless scrolling
@@ -632,42 +615,6 @@ export default function AutoTrader() {
         </div>
       </div>
 
-      {/* Equity curve — hidden by default */}
-      <div className="at-panel">
-        <div className="at-equity-head">
-          <h2 className="at-panel-title">Equity Curve</h2>
-          <button className="at-log-toggle" onClick={() => setEquityVisible(!equityVisible)}>
-            {equityVisible ? 'Hide' : 'Show'}
-          </button>
-        </div>
-        {equityVisible && (
-          <>
-            <div className="at-eq-legend">
-              <span className="at-eq-legend-item"><span className="at-eq-swatch" style={{ background: '#4f6ef7' }} />Your equity</span>
-              <span className="at-eq-legend-item"><span className="at-eq-swatch at-eq-swatch-dash" style={{ background: '#f59e0b' }} />S&amp;P 500 buy &amp; hold</span>
-            </div>
-            {(!trader.equityHistory || trader.equityHistory.length < 2) ? (
-              <p className="at-empty">Not enough data yet — the curve fills in as the bot runs each cycle.</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={equityData} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
-                  <CartesianGrid stroke="#232634" vertical={false} />
-                  <XAxis dataKey="t" tick={{ fontSize: 11, fill: '#6b7280' }} minTickGap={50} />
-                  <YAxis domain={['auto', 'auto']} width={72} tick={{ fontSize: 11, fill: '#6b7280' }}
-                    tickFormatter={v => '$' + Math.round(v).toLocaleString()} />
-                  <Tooltip
-                    contentStyle={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: 8, color: '#e2e8f0' }}
-                    labelStyle={{ color: '#6b7280' }}
-                    formatter={(v, name) => ['$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }), name === 'spy' ? 'S&P 500' : 'Your equity']} />
-                  <Line type="monotone" dataKey="equity" stroke="#4f6ef7" strokeWidth={2} dot={false} name="equity" />
-                  <Line type="monotone" dataKey="spy" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="6 3" name="spy" connectNulls />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </>
-        )}
-      </div>
-
       <div className="at-grid">
         {/* Positions */}
         <div className="at-panel">
@@ -845,7 +792,7 @@ export default function AutoTrader() {
                 <div className="at-pattern-grid">
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="15" width="20" height="30" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="50" y1="15" x2="50" y2="90" stroke="#4ade80" strokeWidth="4"/><rect x="38" y="15" width="24" height="22" fill="#0f1117" stroke="#4ade80" strokeWidth="4" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Hammer</strong>
@@ -854,7 +801,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 80 80" width="80" height="80"><rect x="5" y="20" width="20" height="40" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="15" y1="10" x2="15" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="35" y="15" width="20" height="50" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="45" y1="5" x2="45" y2="75" stroke="#4ade80" strokeWidth="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="32" y1="30" x2="32" y2="75" stroke="#f87171" strokeWidth="3"/><rect x="22" y="45" width="20" height="25" fill="#f87171" stroke="#f87171" strokeWidth="3" rx="2"/><line x1="68" y1="15" x2="68" y2="85" stroke="#4ade80" strokeWidth="3"/><rect x="58" y="20" width="20" height="55" fill="#0f1117" stroke="#4ade80" strokeWidth="3" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Bullish Engulfing</strong>
@@ -863,7 +810,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="30" width="20" height="5" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="1"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="50" y1="15" x2="50" y2="90" stroke="#4ade80" strokeWidth="4"/><rect x="38" y="15" width="24" height="6" fill="#0f1117" stroke="#4ade80" strokeWidth="4" rx="1"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Dragonfly Doji</strong>
@@ -872,7 +819,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 120 80" width="120" height="80"><rect x="5" y="40" width="16" height="25" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="13" y1="30" x2="13" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="25" y="45" width="16" height="20" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="33" y1="35" x2="33" y2="70" stroke="#f87171" strokeWidth="2"/><rect x="45" y="50" width="16" height="15" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="53" y1="40" x2="53" y2="72" stroke="#f87171" strokeWidth="2"/><rect x="70" y="20" width="16" height="45" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="78" y1="10" x2="78" y2="72" stroke="#4ade80" strokeWidth="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="20" y1="25" x2="20" y2="80" stroke="#f87171" strokeWidth="3"/><rect x="12" y="35" width="16" height="35" fill="#f87171" stroke="#f87171" strokeWidth="3" rx="2"/><line x1="50" y1="55" x2="50" y2="75" stroke="#9ca3af" strokeWidth="3"/><rect x="42" y="60" width="16" height="10" fill="#0f1117" stroke="#9ca3af" strokeWidth="3" rx="1"/><line x1="80" y1="15" x2="80" y2="70" stroke="#4ade80" strokeWidth="3"/><rect x="72" y="20" width="16" height="40" fill="#0f1117" stroke="#4ade80" strokeWidth="3" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Morning Star</strong>
@@ -886,7 +833,7 @@ export default function AutoTrader() {
                 <div className="at-pattern-grid">
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#f87171" strokeWidth="2"/><rect x="10" y="45" width="20" height="30" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="50" y1="10" x2="50" y2="85" stroke="#f87171" strokeWidth="4"/><rect x="38" y="63" width="24" height="22" fill="#f87171" stroke="#f87171" strokeWidth="4" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Shooting Star</strong>
@@ -895,7 +842,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 80 80" width="80" height="80"><rect x="5" y="15" width="20" height="40" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="15" y1="5" x2="15" y2="70" stroke="#4ade80" strokeWidth="2"/><rect x="35" y="10" width="20" height="55" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="45" y1="5" x2="45" y2="75" stroke="#f87171" strokeWidth="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="32" y1="10" x2="32" y2="55" stroke="#4ade80" strokeWidth="3"/><rect x="22" y="15" width="20" height="25" fill="#0f1117" stroke="#4ade80" strokeWidth="3" rx="2"/><line x1="68" y1="5" x2="68" y2="80" stroke="#f87171" strokeWidth="3"/><rect x="58" y="10" width="20" height="55" fill="#f87171" stroke="#f87171" strokeWidth="3" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Bearish Engulfing</strong>
@@ -904,7 +851,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#f87171" strokeWidth="2"/><rect x="10" y="45" width="20" height="5" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="1"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="50" y1="10" x2="50" y2="85" stroke="#f87171" strokeWidth="4"/><rect x="38" y="79" width="24" height="6" fill="#f87171" stroke="#f87171" strokeWidth="4" rx="1"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Gravestone Doji</strong>
@@ -913,7 +860,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 120 80" width="120" height="80"><rect x="5" y="15" width="16" height="25" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="13" y1="8" x2="13" y2="50" stroke="#4ade80" strokeWidth="2"/><rect x="25" y="10" width="16" height="20" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="33" y1="5" x2="33" y2="40" stroke="#4ade80" strokeWidth="2"/><rect x="45" y="8" width="16" height="15" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><line x1="53" y1="3" x2="53" y2="30" stroke="#4ade80" strokeWidth="2"/><rect x="70" y="10" width="16" height="50" fill="#f87171" stroke="#f87171" strokeWidth="2" rx="2"/><line x1="78" y1="5" x2="78" y2="68" stroke="#f87171" strokeWidth="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="20" y1="15" x2="20" y2="70" stroke="#4ade80" strokeWidth="3"/><rect x="12" y="20" width="16" height="35" fill="#0f1117" stroke="#4ade80" strokeWidth="3" rx="2"/><line x1="50" y1="10" x2="50" y2="30" stroke="#9ca3af" strokeWidth="3"/><rect x="42" y="15" width="16" height="10" fill="#0f1117" stroke="#9ca3af" strokeWidth="3" rx="1"/><line x1="80" y1="25" x2="80" y2="80" stroke="#f87171" strokeWidth="3"/><rect x="72" y="35" width="16" height="40" fill="#f87171" stroke="#f87171" strokeWidth="3" rx="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Evening Star</strong>
@@ -927,7 +874,7 @@ export default function AutoTrader() {
                 <div className="at-pattern-grid">
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 60 80" width="60" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#4ade80" strokeWidth="2"/><rect x="10" y="20" width="20" height="35" fill="#0f1117" stroke="#4ade80" strokeWidth="2" rx="2"/><text x="42" y="12" fill="#6b7280" fontSize="8">High</text><text x="42" y="27" fill="#4ade80" fontSize="8">Close</text><text x="42" y="58" fill="#4ade80" fontSize="8">Open</text><text x="42" y="78" fill="#6b7280" fontSize="8">Low</text><line x1="37" y1="8" x2="22" y2="8" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="24" x2="30" y2="24" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="55" x2="30" y2="55" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="37" y1="75" x2="22" y2="75" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="30" y1="8" x2="30" y2="92" stroke="#4ade80" strokeWidth="4"/><rect x="20" y="25" width="20" height="45" fill="#0f1117" stroke="#4ade80" strokeWidth="4" rx="2"/><text x="45" y="12" fill="#6b7280" fontSize="10">High</text><text x="45" y="30" fill="#4ade80" fontSize="10">Close</text><text x="45" y="72" fill="#4ade80" fontSize="10">Open</text><text x="45" y="92" fill="#6b7280" fontSize="10">Low</text><line x1="43" y1="9" x2="32" y2="9" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/><line x1="43" y1="27" x2="40" y2="27" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="43" y1="69" x2="40" y2="69" stroke="#4ade80" strokeWidth="1" strokeDasharray="2"/><line x1="43" y1="90" x2="32" y2="90" stroke="#6b7280" strokeWidth="1" strokeDasharray="2"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Anatomy of a Candle</strong>
@@ -936,7 +883,7 @@ export default function AutoTrader() {
                   </div>
                   <div className="at-pattern-card">
                     <div className="at-pattern-icon">
-                      <svg viewBox="0 0 40 80" width="40" height="80"><line x1="20" y1="5" x2="20" y2="75" stroke="#6b7280" strokeWidth="2"/><rect x="10" y="37" width="20" height="6" fill="#1a1d27" stroke="#6b7280" strokeWidth="2" rx="1"/></svg>
+                      <svg viewBox="0 0 100 100" width="64" height="64"><line x1="50" y1="20" x2="50" y2="80" stroke="#9ca3af" strokeWidth="4"/><rect x="38" y="47" width="24" height="6" fill="#1a1d27" stroke="#9ca3af" strokeWidth="4" rx="1"/></svg>
                     </div>
                     <div className="at-pattern-info">
                       <strong>Doji</strong>
