@@ -298,9 +298,10 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
     const currentExposure = position ? position.marketValue : 0;
     const room = config.maxPositionDollars - currentExposure;
     if (room <= 1) return { executed: false, note: 'at max position size for symbol' };
-    const tradeAmount = account.buyingPower * 0.6;
-    const size = Math.min(tradeAmount, room, account.buyingPower * 0.95);
-    if (size < 1) return { executed: false, note: 'insufficient buying power' };
+    // Cap by cash on hand (not buying power, which includes margin) so the
+    // account never goes into a negative cash balance.
+    const size = Math.min(config.perTradeDollars, room, account.cash * 0.95);
+    if (size < 1) return { executed: false, note: 'insufficient cash' };
     await alpaca.createOrder({
       symbol: snap.symbol,
       notional: +size.toFixed(2),
