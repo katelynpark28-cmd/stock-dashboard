@@ -150,11 +150,8 @@ export async function fetchMarketOverview(symbols) {
       const price = q.close ?? q.adjclose;
       return price != null && price > 0;
     });
-    // Only keep today's data points
-    const today = new Date().toDateString();
-    const todayQuotes = quotes.filter(q => new Date(q.date).toDateString() === today);
-    const displayQuotes = todayQuotes.length > 0 ? todayQuotes : quotes.slice(-78); // fallback: last ~6.5h
-    const chartData = displayQuotes.map(q => ({
+    // Default to the full 1-year daily series
+    const chartData = quotes.map(q => ({
       value: parseFloat((q.close ?? q.adjclose).toFixed(2)),
     }));
     return {

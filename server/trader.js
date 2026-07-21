@@ -82,10 +82,49 @@ let state = {
   lastRun: null,
   lastRunNote: null,
   running: false,
+  watchlistDate: null,     // last date the watchlist was auto-rotated
 };
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+// --- Daily watchlist rotation -------------------------------------------------
+// Pool of liquid, well-known tickers to rotate through so the same handful of
+// symbols isn't shown/traded every single day.
+const WATCHLIST_UNIVERSE = [
+  'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AMD', 'NFLX', 'AVGO',
+  'JPM', 'V', 'MA', 'HD', 'COST', 'PEP', 'KO', 'PG', 'JNJ', 'UNH',
+  'CRM', 'ORCL', 'ADBE', 'QCOM', 'TXN', 'INTC', 'CSCO', 'PYPL', 'SHOP', 'UBER',
+  'DIS', 'NKE', 'SBUX', 'PANW', 'SNOW', 'PLTR', 'COIN', 'SOFI', 'DRAM',
+];
+const WATCHLIST_SIZE = 8;
+
+// Deterministic shuffle seeded by a string (the date), so the pick is stable
+// for a given day but different across days.
+function seededShuffle(arr, seedStr) {
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+  const rand = () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function rotateWatchlistIfNeeded() {
+  const todayStr = today();
+  if (state.watchlistDate === todayStr) return;
+  state.config.watchlist = seededShuffle(WATCHLIST_UNIVERSE, todayStr).slice(0, WATCHLIST_SIZE);
+  state.watchlistDate = todayStr;
+  saveState();
 }
 
 function loadState() {
@@ -95,6 +134,7 @@ function loadState() {
     state.log = raw.log || [];
     state.trades = raw.trades && raw.trades.date === today() ? raw.trades : { date: today(), count: 0 };
     state.equityHistory = raw.equityHistory || [];
+    state.watchlistDate = raw.watchlistDate || null;
   } catch {
     // first run — no state file yet
   }
@@ -102,7 +142,7 @@ function loadState() {
 
 function saveState() {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300) }, null, 2));
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate }, null, 2));
   } catch (e) {
     console.error('Failed to save trader state:', e.message);
   }
@@ -338,6 +378,7 @@ async function runOnce(manual = false) {
   if (state.running) return;
   state.running = true;
   try {
+    rotateWatchlistIfNeeded();
     // Reset daily counter on date rollover
     if (state.trades.date !== today()) state.trades = { date: today(), count: 0 };
 
@@ -439,6 +480,7 @@ function scheduleLoop() {
 export const trader = {
   init() {
     loadState();
+    rotateWatchlistIfNeeded();
     scheduleLoop();
   },
   getState() {

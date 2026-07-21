@@ -84,15 +84,15 @@ export default function App() {
           </div>
           <nav className="header-nav">
             <button
-              className={`nav-btn ${view === 'research' ? 'active' : ''}`}
-              onClick={() => setView('research')}
-            >Research</button>
-            <button
               className={`nav-btn ${view === 'trader' ? 'active' : ''}`}
               onClick={() => setView('trader')}
             >🤖 Auto-Trader</button>
+            <button
+              className={`nav-btn ${view === 'research' ? 'active' : ''}`}
+              onClick={() => setView('research')}
+            >Research</button>
           </nav>
-          <form onSubmit={handleSubmit} className="search-form" ref={wrapperRef} style={{ visibility: view === 'trader' ? 'hidden' : 'visible' }}>
+          <form onSubmit={handleSubmit} className="search-form" ref={wrapperRef} style={{ display: view === 'trader' ? 'none' : 'flex' }}>
             <div className="search-wrap">
               <input
                 className="search-input"
@@ -119,7 +119,7 @@ export default function App() {
               {loading ? 'Loading…' : 'Search'}
             </button>
           </form>
-          <p className="at-attribution">
+          <p className={`at-attribution ${view === 'trader' ? 'at-attribution-wide' : ''}`}>
             This tool is built by Katelyn Park with Claude Code, Groq, Gemini, Alpaca. This uses fake money for simulation purposes only. If you have any questions or comments, please reach out to <a href="mailto:katelyn_park@brown.edu">katelyn_park@brown.edu</a>.
           </p>
         </div>

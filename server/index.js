@@ -285,22 +285,27 @@ app.get('/api/screener', async (req, res) => {
     const universe = mode === 'growth' ? GROWTH_UNIVERSE : STABLE_UNIVERSE;
 
     const quotes = await Promise.all(
-      universe.map(s => cached(`screener:${s}`, 60000, () =>
-        yahooFinance.chart(s, { period1: new Date(Date.now() - 30 * 86400000), period2: new Date(), interval: '1d' })
-          .then(c => {
-            const m = c.meta || {};
-            const qs = (c.quotes || []).filter(q => q.close != null);
-            const last = qs.length ? qs[qs.length - 1] : {};
-            const prev = m.chartPreviousClose || (qs.length > 1 ? qs[qs.length - 2].close : null);
-            const price = m.regularMarketPrice || last.close;
+      universe.map(s => cached(`screenerfund:${s}`, 300000, () =>
+        yahooFinance.quoteSummary(s, { modules: ['price', 'summaryDetail', 'defaultKeyStatistics'] })
+          .then(d => {
+            const price = d.price || {};
+            const detail = d.summaryDetail || {};
+            const stats = d.defaultKeyStatistics || {};
             return {
-              symbol: s, shortName: m.shortName || s, longName: m.longName || m.shortName || s,
-              regularMarketPrice: price,
-              regularMarketChangePercent: prev ? ((price - prev) / prev) * 100 : null,
-              fiftyTwoWeekHigh: m.fiftyTwoWeekHigh || null,
-              fiftyTwoWeekLow: m.fiftyTwoWeekLow || null,
-              epsTrailingTwelveMonths: null, epsForward: null, beta: null,
-              trailingPE: null, forwardPE: null,
+              symbol: s,
+              shortName: price.shortName || s,
+              longName: price.longName || price.shortName || s,
+              regularMarketPrice: price.regularMarketPrice ?? null,
+              regularMarketChangePercent: price.regularMarketChangePercent ?? null,
+              fiftyTwoWeekHigh: detail.fiftyTwoWeekHigh ?? null,
+              fiftyTwoWeekLow: detail.fiftyTwoWeekLow ?? null,
+              epsTrailingTwelveMonths: stats.trailingEps ?? null,
+              epsForward: stats.forwardEps ?? null,
+              beta: detail.beta ?? null,
+              trailingPE: detail.trailingPE ?? null,
+              forwardPE: detail.forwardPE ?? null,
+              marketCap: price.marketCap ?? detail.marketCap ?? null,
+              dividendYield: detail.dividendYield ?? null,
             };
           })
       ).catch(() => null))
@@ -363,14 +368,14 @@ app.get('/api/market-overview', async (req, res) => {
     const symbols = req.query.symbols
       ? req.query.symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
       : ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'BRK-B', 'AVGO', 'JPM'];
-    const period1 = new Date(Date.now() - 2 * 86400000);
+    const period1 = new Date(Date.now() - 365 * 86400000);
     const results = await Promise.all(
       symbols.map(async (symbol) => {
         const [chartData, history] = await Promise.all([
           cached(`mktquote:${symbol}`, 30000, () =>
             yahooFinance.chart(symbol, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
           ),
-          cached(`mktovw:${symbol}`, 60000, () => yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '5m' })),
+          cached(`mktovw:${symbol}`, 3600000, () => yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '1d' })),
         ]);
         const m = chartData.meta || {};
         const qs = (chartData.quotes || []).filter(q => q.close != null);

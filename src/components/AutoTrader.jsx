@@ -349,11 +349,6 @@ export default function AutoTrader() {
           <span className="at-paper-badge">PAPER · fake money</span>
         </div>
       </div>
-      <p className="at-disclaimer">
-        This bot uses AI chart analysis to place <strong>paper</strong> trades automatically. It is an experiment, not
-        investment advice — technical signals do not reliably predict prices. Do not connect a live account.
-      </p>
-
       {error && <div className="at-error">⚠️ {error}</div>}
 
       {/* Account summary */}
@@ -419,7 +414,7 @@ export default function AutoTrader() {
         </div>
         <div className="at-charts-split">
           <div className="at-chart-half">
-            <div className="at-chart-label-row">
+            <div className="at-chart-label-row at-chart-label-row-candle">
               <h3 className="at-chart-label">Candlestick <button className="at-patterns-btn" onClick={() => setShowPatterns(true)} title="Candlestick patterns guide">?</button></h3>
               <div className="at-interval-picker">
                 {['1D', '1W', '1M', '3M', '1Y'].map(p => (
