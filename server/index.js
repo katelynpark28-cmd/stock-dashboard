@@ -54,31 +54,60 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// Lightweight live quote for polling
+// Lightweight live quote for polling (uses chart() to avoid crumb/429 issues)
 app.get('/api/quote/:symbol', async (req, res) => {
   try {
-    const q = await cached(`quote:${req.params.symbol}`, 30000, () => yahooFinance.quote(req.params.symbol));
+    const chart = await cached(`quotechart:${req.params.symbol}`, 30000, () =>
+      yahooFinance.chart(req.params.symbol, { period1: new Date(Date.now() - 2 * 86400000), period2: new Date(), interval: '1d' })
+    );
+    const meta = chart.meta || {};
+    const quotes = (chart.quotes || []).filter(q => q.close != null);
+    const last = quotes.length ? quotes[quotes.length - 1] : {};
+    const price = meta.regularMarketPrice || last.close;
+    const prev = meta.chartPreviousClose || (quotes.length > 1 ? quotes[quotes.length - 2].close : null);
     res.json({
-      price: q.regularMarketPrice,
-      change: q.regularMarketChange,
-      changePct: q.regularMarketChangePercent,
-      high: q.regularMarketDayHigh,
-      low: q.regularMarketDayLow,
-      volume: q.regularMarketVolume,
+      price,
+      change: prev ? price - prev : null,
+      changePct: prev ? ((price - prev) / prev) * 100 : null,
+      high: last.high || meta.regularMarketDayHigh,
+      low: last.low || meta.regularMarketDayLow,
+      volume: last.volume || null,
     });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
 });
 
-// Company profile + quote
+// Company profile + quote (uses chart() for price data to avoid crumb/429 issues)
 app.get('/api/profile/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
-    const [quote, summary] = await Promise.all([
-      cached(`quote:${symbol}`, 30000, () => yahooFinance.quote(symbol)),
+    const [chart, summary] = await Promise.all([
+      cached(`profilechart:${symbol}`, 30000, () =>
+        yahooFinance.chart(symbol, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
+      ),
       cached(`summary:${symbol}`, 300000, () => yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'financialData', 'defaultKeyStatistics'] })),
     ]);
+    const meta = chart.meta || {};
+    const quotes = (chart.quotes || []).filter(q => q.close != null);
+    const last = quotes.length ? quotes[quotes.length - 1] : {};
+    const prev = meta.chartPreviousClose || (quotes.length > 1 ? quotes[quotes.length - 2].close : null);
+    const quote = {
+      symbol,
+      shortName: meta.shortName || symbol,
+      regularMarketPrice: meta.regularMarketPrice || last.close,
+      regularMarketChange: prev ? (meta.regularMarketPrice || last.close) - prev : null,
+      regularMarketChangePercent: prev ? (((meta.regularMarketPrice || last.close) - prev) / prev) * 100 : null,
+      regularMarketDayHigh: last.high || null,
+      regularMarketDayLow: last.low || null,
+      regularMarketVolume: last.volume || null,
+      regularMarketPreviousClose: prev,
+      fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || null,
+      fiftyTwoWeekLow: meta.fiftyTwoWeekLow || null,
+      marketCap: meta.marketCap || null,
+      currency: meta.currency || 'USD',
+      exchange: meta.exchangeName || meta.fullExchangeName || '',
+    };
     res.json({ quote, assetProfile: summary.assetProfile, financialData: summary.financialData, keyStats: summary.defaultKeyStatistics });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -256,7 +285,25 @@ app.get('/api/screener', async (req, res) => {
     const universe = mode === 'growth' ? GROWTH_UNIVERSE : STABLE_UNIVERSE;
 
     const quotes = await Promise.all(
-      universe.map(s => yahooFinance.quote(s).catch(() => null))
+      universe.map(s => cached(`screener:${s}`, 60000, () =>
+        yahooFinance.chart(s, { period1: new Date(Date.now() - 30 * 86400000), period2: new Date(), interval: '1d' })
+          .then(c => {
+            const m = c.meta || {};
+            const qs = (c.quotes || []).filter(q => q.close != null);
+            const last = qs.length ? qs[qs.length - 1] : {};
+            const prev = m.chartPreviousClose || (qs.length > 1 ? qs[qs.length - 2].close : null);
+            const price = m.regularMarketPrice || last.close;
+            return {
+              symbol: s, shortName: m.shortName || s, longName: m.longName || m.shortName || s,
+              regularMarketPrice: price,
+              regularMarketChangePercent: prev ? ((price - prev) / prev) * 100 : null,
+              fiftyTwoWeekHigh: m.fiftyTwoWeekHigh || null,
+              fiftyTwoWeekLow: m.fiftyTwoWeekLow || null,
+              epsTrailingTwelveMonths: null, epsForward: null, beta: null,
+              trailingPE: null, forwardPE: null,
+            };
+          })
+      ).catch(() => null))
     );
     const valid = quotes.filter(q => q && q.regularMarketPrice > 0);
 
@@ -319,10 +366,26 @@ app.get('/api/market-overview', async (req, res) => {
     const period1 = new Date(Date.now() - 2 * 86400000);
     const results = await Promise.all(
       symbols.map(async (symbol) => {
-        const [quote, history] = await Promise.all([
-          cached(`quote:${symbol}`, 30000, () => yahooFinance.quote(symbol)),
+        const [chartData, history] = await Promise.all([
+          cached(`mktquote:${symbol}`, 30000, () =>
+            yahooFinance.chart(symbol, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
+          ),
           cached(`mktovw:${symbol}`, 60000, () => yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '5m' })),
         ]);
+        const m = chartData.meta || {};
+        const qs = (chartData.quotes || []).filter(q => q.close != null);
+        const last = qs.length ? qs[qs.length - 1] : {};
+        const prev = m.chartPreviousClose || (qs.length > 1 ? qs[qs.length - 2].close : null);
+        const price = m.regularMarketPrice || last.close;
+        const quote = {
+          symbol, shortName: m.shortName || symbol,
+          regularMarketPrice: price,
+          regularMarketChange: prev ? price - prev : null,
+          regularMarketChangePercent: prev ? ((price - prev) / prev) * 100 : null,
+          regularMarketDayHigh: last.high || null,
+          regularMarketDayLow: last.low || null,
+          regularMarketVolume: last.volume || null,
+        };
         return { symbol, quote, history };
       })
     );
