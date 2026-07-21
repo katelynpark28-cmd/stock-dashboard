@@ -95,8 +95,11 @@ export default function MarketOverview({ onSearch }) {
         </div>
       )}
       {error && <div className="error-state">⚠️ {error}</div>}
+      {!loading && !error && stocks.length === 0 && (
+        <div className="error-state">⚠️ Unable to load market data right now — the data provider may be rate-limited. Try again shortly.</div>
+      )}
 
-      {!loading && !error && (
+      {!loading && !error && stocks.length > 0 && (
         <div className="overview-grid">
           {stocks.map(s => {
             const up = (s.changePct ?? 0) >= 0;
