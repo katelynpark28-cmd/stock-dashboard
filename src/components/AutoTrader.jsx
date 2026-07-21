@@ -354,7 +354,7 @@ export default function AutoTrader() {
       {/* Account summary */}
       <div className="at-cards">
         <div className="at-card">
-          <span className="at-card-label">Equity</span>
+          <span className="at-card-label">Total Fund</span>
           <span className="at-card-value">
             <RollingNumber value={money(account?.equity)} flash={cardFlash.equity} />
           </span>
@@ -366,7 +366,7 @@ export default function AutoTrader() {
           </span>
         </div>
         <div className="at-card">
-          <span className="at-card-label">Cash</span>
+          <span className="at-card-label">Avail Fund</span>
           <span className="at-card-value">
             <RollingNumber value={money(account?.cash)} flash={cardFlash.cash} />
           </span>
