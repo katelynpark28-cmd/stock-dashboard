@@ -19,7 +19,7 @@ const timeAgo = (iso) => {
 };
 
 export default function AutoTrader() {
-  const isAdmin = new URLSearchParams(window.location.search).has('admin');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -50,6 +50,19 @@ export default function AutoTrader() {
 
   const [form, setForm] = useState(null);
   const loadedForm = useRef(false);
+
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get('admin');
+    if (!key) return;
+    fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+      .then(r => r.json())
+      .then(d => setIsAdmin(!!d.admin))
+      .catch(() => {});
+  }, []);
 
   const refresh = useCallback(async () => {
     try {

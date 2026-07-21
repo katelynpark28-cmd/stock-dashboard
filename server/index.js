@@ -476,6 +476,13 @@ app.post('/api/trader/atr-levels', async (req, res) => {
   }
 });
 
+// Admin key verification
+app.post('/api/auth/verify', (req, res) => {
+  const { key } = req.body;
+  const valid = key && process.env.ADMIN_KEY && key === process.env.ADMIN_KEY;
+  res.json({ admin: !!valid });
+});
+
 // --- Alpaca paper trading + auto-trader bot ---------------------------------
 app.get('/api/alpaca/account', async (req, res) => {
   try { res.json(await getAccountSummary()); }
