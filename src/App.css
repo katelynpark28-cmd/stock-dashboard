@@ -840,6 +840,7 @@ body {
   outline: none;
 }
 .at-field input:focus { border-color: #4f6ef7; }
+.at-settings-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .at-save-btn {
   background: #4f6ef7;
   border: none;
@@ -852,6 +853,19 @@ body {
   height: fit-content;
 }
 .at-save-btn:disabled { opacity: 0.6; cursor: default; }
+.at-restore-btn {
+  background: transparent;
+  border: 1px solid #2d3148;
+  border-radius: 8px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.at-restore-btn:hover { border-color: #4f6ef7; color: #e2e8f0; }
+.at-restore-btn:disabled { opacity: 0.5; cursor: default; }
 
 .at-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 
@@ -940,6 +954,10 @@ body {
   min-width: 18px;
   padding: 1px 6px;
   text-align: center;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .at-filter-btn:not(.active) .at-filter-count { background: #2d3148; color: #8da2fb; }
 
@@ -1004,8 +1022,8 @@ body {
 .at-charts-head .at-panel-title { margin-bottom: 0; }
 .at-charts-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .at-chart-half { min-width: 0; }
-.at-chart-label { color: #6b7280; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0; }
-.at-chart-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.at-chart-label { color: #6b7280; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0; display: flex; align-items: center; }
+.at-chart-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding-left: 60px; }
 .at-interval-picker { display: flex; gap: 3px; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; padding: 3px; }
 .at-interval-btn { background: transparent; border: none; color: #6b7280; font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
 .at-interval-btn:hover { color: #e2e8f0; }
@@ -1022,7 +1040,7 @@ body {
 .at-equity-head .at-panel-title { margin-bottom: 0; }
 
 /* Patterns guide button */
-.at-patterns-btn { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #4f6ef7; background: rgba(79,110,247,0.1); color: #8da2fb; font-size: 0.7rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: 6px; vertical-align: middle; }
+.at-patterns-btn { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #4f6ef7; background: rgba(79,110,247,0.1); color: #8da2fb; font-size: 0.65rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; margin-left: 6px; flex-shrink: 0; }
 .at-patterns-btn:hover { border-color: #8da2fb; color: #e2e8f0; background: rgba(79,110,247,0.2); }
 
 /* Patterns modal */

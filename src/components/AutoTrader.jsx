@@ -219,6 +219,17 @@ export default function AutoTrader() {
 
   const [atrLoading, setAtrLoading] = useState(false);
 
+  const DEFAULTS = {
+    intervalMinutes: 15,
+    perTradeDollars: 2000,
+    maxPositionDollars: 60000,
+    maxTradesPerDay: 10,
+    minConfidence: 0.6,
+    stopLossPct: -3,
+    takeProfitPct: 5,
+    tickerOverrides: {},
+  };
+
   async function autoSetFromATR() {
     const watchlist = trader.config.watchlist;
     if (!watchlist.length) return;
@@ -235,12 +246,39 @@ export default function AutoTrader() {
           };
         }
       }
-      setForm({ ...form, tickerOverrides: overrides });
+      const updatedForm = { ...form, tickerOverrides: overrides };
+      setForm(updatedForm);
+      const wl = updatedForm.watchlistText.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      await pushConfig({
+        watchlist: wl,
+        intervalMinutes: +updatedForm.intervalMinutes,
+        perTradeDollars: +updatedForm.perTradeDollars,
+        maxPositionDollars: +updatedForm.maxPositionDollars,
+        maxTradesPerDay: +updatedForm.maxTradesPerDay,
+        minConfidence: +updatedForm.minConfidence,
+        stopLossPct: +updatedForm.stopLossPct,
+        takeProfitPct: +updatedForm.takeProfitPct,
+        tickerOverrides: overrides,
+      });
     } catch (e) {
       setError(e.message);
     } finally {
       setAtrLoading(false);
     }
+  }
+
+  async function restoreDefaults() {
+    const watchlist = trader.config.watchlist;
+    const newForm = {
+      ...DEFAULTS,
+      watchlist,
+      watchlistText: watchlist.join(', '),
+    };
+    setForm(newForm);
+    await pushConfig({
+      watchlist,
+      ...DEFAULTS,
+    });
   }
 
   function handleTickerClick(sym) {
@@ -547,9 +585,14 @@ export default function AutoTrader() {
             <input type="number" min="0" step="0.5" value={form.takeProfitPct} disabled={!isAdmin}
               onChange={e => setForm({ ...form, takeProfitPct: e.target.value })} />
           </label>
-          {isAdmin && <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
-            {saving ? 'Saving…' : 'Save settings'}
-          </button>}
+          {isAdmin && <div className="at-settings-actions">
+            <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
+              {saving ? 'Saving…' : 'Save settings'}
+            </button>
+            <button className="at-restore-btn" onClick={restoreDefaults} disabled={saving}>
+              Restore defaults
+            </button>
+          </div>}
         </div>
 
         {/* Per-ticker exit overrides */}
