@@ -176,14 +176,15 @@ function rsi(closes, period = 14) {
 
 async function buildSnapshot(symbol) {
   const period1 = new Date(Date.now() - 200 * 86400000); // ~200 days of daily bars
-  const [quote, chart, newsResult] = await Promise.all([
-    yahooFinance.quote(symbol),
+  const [chart, newsResult] = await Promise.all([
     yahooFinance.chart(symbol, { period1, period2: new Date(), interval: '1d' }),
     yahooFinance.search(symbol, { newsCount: 3, quotesCount: 0 }).catch(() => ({ news: [] })),
   ]);
+  const meta = chart.meta || {};
   const allQuotes = chart.quotes || [];
   const closes = allQuotes.map(q => q.close ?? q.adjclose).filter(v => v != null && v > 0);
-  const price = quote.regularMarketPrice;
+  const price = meta.regularMarketPrice ?? closes[closes.length - 1];
+  const prevClose = meta.chartPreviousClose ?? (closes.length > 1 ? closes[closes.length - 2] : null);
   const sma20 = sma(closes, 20);
   const sma50 = sma(closes, 50);
   const fiveDayAgo = closes.length >= 6 ? closes[closes.length - 6] : null;
@@ -199,12 +200,12 @@ async function buildSnapshot(symbol) {
   return {
     symbol,
     price,
-    changePct: quote.regularMarketChangePercent,
+    changePct: prevClose ? ((price - prevClose) / prevClose) * 100 : null,
     sma20,
     sma50,
     rsi14: rsi(closes, 14),
-    pctFromHigh52: quote.fiftyTwoWeekHigh ? ((price - quote.fiftyTwoWeekHigh) / quote.fiftyTwoWeekHigh) * 100 : null,
-    pctFromLow52: quote.fiftyTwoWeekLow ? ((price - quote.fiftyTwoWeekLow) / quote.fiftyTwoWeekLow) * 100 : null,
+    pctFromHigh52: meta.fiftyTwoWeekHigh ? ((price - meta.fiftyTwoWeekHigh) / meta.fiftyTwoWeekHigh) * 100 : null,
+    pctFromLow52: meta.fiftyTwoWeekLow ? ((price - meta.fiftyTwoWeekLow) / meta.fiftyTwoWeekLow) * 100 : null,
     momentum5d: fiveDayAgo ? ((price - fiveDayAgo) / fiveDayAgo) * 100 : null,
     news: (newsResult.news || []).map(n => n.title).filter(Boolean).slice(0, 3),
     candles: recentCandles,
@@ -397,7 +398,11 @@ async function runOnce(manual = false) {
 
     // Record one equity point per cycle, plus S&P 500 price for the buy-and-hold benchmark
     let spyPrice = null;
-    try { spyPrice = (await yahooFinance.quote('^GSPC')).regularMarketPrice ?? null; } catch { /* benchmark just gaps */ }
+    try {
+      const spyChart = await yahooFinance.chart('^GSPC', { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' });
+      const spyQuotes = (spyChart.quotes || []).filter(q => q.close != null);
+      spyPrice = spyChart.meta?.regularMarketPrice ?? (spyQuotes.length ? spyQuotes[spyQuotes.length - 1].close : null);
+    } catch { /* benchmark just gaps */ }
     state.equityHistory.push({ time: new Date().toISOString(), equity: account.equity, spy: spyPrice });
     if (state.equityHistory.length > 300) state.equityHistory = state.equityHistory.slice(-300);
 
