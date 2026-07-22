@@ -71,6 +71,7 @@ export default function AutoTrader() {
 
   const [form, setForm] = useState(null);
   const loadedForm = useRef(false);
+  const overrideSaveTimers = useRef({});
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -215,6 +216,38 @@ export default function AutoTrader() {
 
   async function toggleEnabled() {
     await pushConfig({ enabled: !trader.config.enabled });
+  }
+
+  // Per-ticker exit rule edits auto-save (debounced) instead of requiring a
+  // separate click on the shared "Save settings" button — previously these
+  // silently reset on reload if the user forgot to click Save. Updates only
+  // `trader` (not the whole `form`) so it doesn't clobber other in-progress
+  // edits elsewhere on the settings panel.
+  function setTickerOverride(sym, field, val) {
+    const ovr = form.tickerOverrides?.[sym] || {};
+    const updatedOverrides = { ...form.tickerOverrides, [sym]: { ...ovr, [field]: val } };
+    setForm(f => ({ ...f, tickerOverrides: updatedOverrides }));
+
+    clearTimeout(overrideSaveTimers.current[sym]);
+    overrideSaveTimers.current[sym] = setTimeout(async () => {
+      const cleaned = {};
+      for (const s of Object.keys(updatedOverrides)) {
+        const o = updatedOverrides[s];
+        const hasSl = o?.stopLossPct !== '' && o?.stopLossPct != null;
+        const hasTp = o?.takeProfitPct !== '' && o?.takeProfitPct != null;
+        if (hasSl || hasTp) {
+          cleaned[s] = {};
+          if (hasSl) cleaned[s].stopLossPct = +o.stopLossPct;
+          if (hasTp) cleaned[s].takeProfitPct = +o.takeProfitPct;
+        }
+      }
+      try {
+        const t = await saveTraderConfig({ tickerOverrides: cleaned });
+        setTrader(t);
+      } catch (e) {
+        setError(e.message);
+      }
+    }, 800);
   }
 
   async function saveSettings() {
@@ -610,7 +643,7 @@ export default function AutoTrader() {
           <div className="at-overrides-head">
             <div>
               <h3 className="at-overrides-title">Per-Ticker Exit Rules</h3>
-              <p className="at-overrides-sub">Leave blank to use the global defaults above.</p>
+              <p className="at-overrides-sub">Leave blank to use the global defaults above. Changes save automatically.</p>
             </div>
             {isAdmin && <button className="at-atr-btn" onClick={autoSetFromATR} disabled={atrLoading}>
               {atrLoading ? 'Calculating…' : 'Auto-set from volatility'}
@@ -619,10 +652,7 @@ export default function AutoTrader() {
           <div className="at-overrides-grid">
             {trader.config.watchlist.map(sym => {
               const ovr = form.tickerOverrides?.[sym] || {};
-              const setOvr = (field, val) => setForm({
-                ...form,
-                tickerOverrides: { ...form.tickerOverrides, [sym]: { ...ovr, [field]: val } },
-              });
+              const setOvr = (field, val) => setTickerOverride(sym, field, val);
               return (
                 <div className="at-ovr-row" key={sym}>
                   <TickerLink symbol={sym} name={tickerNames[sym]} className="at-ovr-sym" />
