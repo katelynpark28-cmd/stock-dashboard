@@ -688,7 +688,7 @@ body {
 .nav-btn.active { background: #4f6ef7; border-color: #4f6ef7; color: #fff; }
 
 /* ===== Auto-Trader ===== */
-.at-wrap { max-width: 2400px; margin: 0 auto; padding: 28px 32px 80px; }
+.at-wrap { max-width: 2400px; margin: 0 auto; padding: 0 32px 80px; }
 .at-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 80px; color: #a0aec0; }
 
 .at-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
@@ -963,7 +963,7 @@ body {
 .at-chart-half { min-width: 0; }
 .at-chart-label { color: #6b7280; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0; display: flex; align-items: center; }
 .at-chart-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding-left: 60px; }
-.at-chart-label-row-candle { padding-left: 36px; }
+.at-chart-label-row-candle { padding-left: 24px; }
 .at-interval-picker { display: flex; gap: 3px; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; padding: 3px; }
 .at-interval-btn { background: transparent; border: none; color: #6b7280; font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
 .at-interval-btn:hover { color: #e2e8f0; }

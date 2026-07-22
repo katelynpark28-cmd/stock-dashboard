@@ -46,7 +46,7 @@ export default function CandlestickChart({ symbol, period = '1D' }) {
   const ready = !loading && candles.length > 0 && width > 0;
 
   const height = 340;
-  const margin = { top: 12, right: 12, bottom: 28, left: 60 };
+  const margin = { top: 12, right: 12, bottom: 28, left: 48 };
   const innerW = width - margin.left - margin.right;
   const innerH = height - margin.top - margin.bottom;
 
