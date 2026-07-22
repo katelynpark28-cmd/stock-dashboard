@@ -48,6 +48,17 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // A ticker link opened in a new tab lands here with ?ticker=SYMBOL — jump
+  // straight to that ticker's research page instead of the default view.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get('ticker');
+    if (t) {
+      setView('research');
+      search(t);
+    }
+  }, []);
+
   async function search(sym) {
     const symbol = (typeof sym === 'string' ? sym : ticker).trim().toUpperCase();
     if (!symbol) return;
@@ -130,7 +141,7 @@ export default function App() {
 
       <main className="main">
         {view === 'trader' ? (
-          <AutoTrader onSelectTicker={(sym) => { setView('research'); search(sym); }} />
+          <AutoTrader />
         ) : (
           <>
             {!data && !loading && !error && <MarketOverview onSearch={search} />}

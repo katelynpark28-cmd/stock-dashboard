@@ -919,16 +919,19 @@ body {
 .at-tape:hover { animation-play-state: paused; }
 @keyframes tape-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 .at-tape-item { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 0.95rem; }
-.at-tape-clickable { cursor: pointer; }
-.at-tape-tooltip {
+.at-tape-sym { color: #e2e8f0; font-weight: 700; font-size: 0.9rem; }
+
+/* Shared ticker link: opens research in a new tab, shows full name on hover */
+.at-ticker-link { position: relative; display: inline-block; color: inherit; text-decoration: none; cursor: pointer; }
+.at-ticker-link:hover { text-decoration: underline; }
+.at-ticker-tooltip {
   position: absolute; top: 100%; left: 50%; transform: translateX(-50%) translateY(4px);
   background: #1a1d27; border: 1px solid #2d3148; border-radius: 6px;
   padding: 4px 10px; font-size: 0.72rem; font-weight: 500; color: #e2e8f0;
   white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s;
   z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-.at-tape-item:hover .at-tape-tooltip { opacity: 1; }
-.at-tape-sym { color: #e2e8f0; font-weight: 700; font-size: 0.9rem; }
+.at-ticker-link:hover .at-ticker-tooltip { opacity: 1; }
 .at-tape-price { color: #e2e8f0; font-family: monospace; font-size: 0.95rem; font-weight: 600; }
 .at-tape-change { font-weight: 700; font-size: 0.85rem; }
 .at-tape-change.pos { color: #4ade80; }

@@ -18,7 +18,24 @@ const timeAgo = (iso) => {
   return `${Math.floor(s / 3600)}h ago`;
 };
 
-export default function AutoTrader({ onSelectTicker }) {
+// Every ticker mention across the page uses this: opens that ticker's
+// research page in a new tab, and shows the full company name on hover.
+function TickerLink({ symbol, name, className = '' }) {
+  return (
+    <a
+      href={`?ticker=${symbol}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`at-ticker-link ${className}`}
+      onClick={e => e.stopPropagation()}
+    >
+      {symbol}
+      {name && <span className="at-ticker-tooltip">{name}</span>}
+    </a>
+  );
+}
+
+export default function AutoTrader() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginKey, setLoginKey] = useState('');
@@ -42,6 +59,10 @@ export default function AutoTrader({ onSelectTicker }) {
 
   // Ticker tape prices
   const [tickerPrices, setTickerPrices] = useState([]);
+  // Full company names for every ticker ever shown on this page (watchlist,
+  // positions, journal) — keyed by symbol, never pruned so historical
+  // symbols keep their name after rotating out of the watchlist.
+  const [tickerNames, setTickerNames] = useState({});
   const prevAccountRef = useRef({});
   const [cardFlash, setCardFlash] = useState({});
 
@@ -109,6 +130,26 @@ export default function AutoTrader({ onSelectTicker }) {
     }, 30000);
     return () => clearInterval(id);
   }, [trader?.config.watchlist.join(',')]);
+
+  // Look up full company names for every ticker shown anywhere on this page
+  // (watchlist, open positions, trade journal) so hover tooltips work even
+  // for symbols that have since rotated out of the watchlist.
+  useEffect(() => {
+    if (!trader) return;
+    const symbols = [...new Set([
+      ...trader.config.watchlist,
+      ...positions.map(p => p.symbol),
+      ...trader.log.map(d => d.symbol),
+    ])].filter(Boolean);
+    if (!symbols.length) return;
+    fetchPrices(symbols).then(data => {
+      setTickerNames(prev => {
+        const next = { ...prev };
+        data.forEach(d => { if (d.name) next[d.symbol] = d.name; });
+        return next;
+      });
+    }).catch(() => {});
+  }, [trader?.config.watchlist.join(','), positions.map(p => p.symbol).join(','), trader?.log.length]);
 
   // Flash account cards when values change
   useEffect(() => {
@@ -301,19 +342,17 @@ export default function AutoTrader({ onSelectTicker }) {
             {tapeItems.map((t, i) => {
               const isIndex = t.symbol.startsWith('^');
               const displaySym = t.symbol === '^GSPC' ? 'S&P 500' : t.symbol === '^DJI' ? 'Dow Jones' : t.symbol === '^IXIC' ? 'NASDAQ' : t.symbol;
-              const fullName = isIndex ? displaySym : (t.name || t.symbol);
               return (
-                <span
-                  className={`at-tape-item ${isIndex ? '' : 'at-tape-clickable'}`}
-                  key={i}
-                  onClick={isIndex ? undefined : () => onSelectTicker?.(t.symbol)}
-                >
-                  <span className="at-tape-sym">{displaySym}</span>
+                <span className="at-tape-item" key={i}>
+                  {isIndex ? (
+                    <span className="at-tape-sym">{displaySym}</span>
+                  ) : (
+                    <TickerLink symbol={t.symbol} name={t.name} className="at-tape-sym" />
+                  )}
                   <span className="at-tape-price">{t.price != null ? `$${t.price.toFixed(2)}` : '—'}</span>
                   <span className={`at-tape-change ${(t.change ?? 0) >= 0 ? 'pos' : 'neg'}`}>
                     {t.change != null ? `${t.change >= 0 ? '+' : ''}${t.change.toFixed(2)}%` : ''}
                   </span>
-                  <span className="at-tape-tooltip">{fullName}</span>
                 </span>
               );
             })}
@@ -586,7 +625,7 @@ export default function AutoTrader({ onSelectTicker }) {
               });
               return (
                 <div className="at-ovr-row" key={sym}>
-                  <span className="at-ovr-sym">{sym}</span>
+                  <TickerLink symbol={sym} name={tickerNames[sym]} className="at-ovr-sym" />
                   <label className="at-ovr-field">
                     <span>SL %</span>
                     <input type="number" max="0" step="0.5" disabled={!isAdmin}
@@ -619,7 +658,7 @@ export default function AutoTrader({ onSelectTicker }) {
             <tbody>
               {positions.map(p => (
                 <tr key={p.symbol}>
-                  <td className="at-sym">{p.symbol}</td>
+                  <td className="at-sym"><TickerLink symbol={p.symbol} name={tickerNames[p.symbol]} /></td>
                   <td>{p.qty}</td>
                   <td>{money(p.avgEntry)}</td>
                   <td>{money(p.current)}</td>
@@ -646,7 +685,7 @@ export default function AutoTrader({ onSelectTicker }) {
               {journal.map((d, i) => (
                 <tr key={i}>
                   <td>{new Date(d.time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                  <td className="at-sym">{d.symbol}</td>
+                  <td className="at-sym"><TickerLink symbol={d.symbol} name={tickerNames[d.symbol]} /></td>
                   <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
                   <td>{d.note}</td>
                   <td>{money(d.price)}</td>
