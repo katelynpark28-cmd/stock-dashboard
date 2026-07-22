@@ -880,82 +880,12 @@ body {
 .at-sym { font-weight: 700; color: #fff; }
 .at-table small { opacity: 0.75; font-size: 0.78rem; }
 
-.at-log { display: flex; flex-direction: column; }
-.at-log-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 4px;
-  border-bottom: 1px solid #232634;
-  font-size: 0.88rem;
-}
-.at-log-row:last-child { border-bottom: none; }
-.at-action {
-  font-size: 0.7rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 4px 9px;
-  border-radius: 6px;
-  min-width: 48px;
-  text-align: center;
-}
-.at-buy { background: rgba(52,211,153,0.15); color: #34d399; }
-.at-sell { background: rgba(248,113,113,0.15); color: #f87171; }
-.at-hold { background: rgba(148,163,184,0.12); color: #94a3b8; }
-.at-action.at-error { background: rgba(251,146,60,0.15); color: #fb923c; border: none; padding: 4px 9px; margin: 0; }
-.at-log-sym { font-weight: 700; color: #fff; min-width: 56px; }
-.at-log-reason { color: #cbd5e1; flex: 1; }
-.at-log-meta { display: flex; align-items: center; gap: 12px; color: #6b7280; font-size: 0.78rem; white-space: nowrap; }
-.at-conf { color: #8da2fb; }
-.at-exec { color: #34d399; font-weight: 600; }
-.at-noexec { color: #6b7280; }
-.at-log-time { color: #4a5568; }
-
 @media (max-width: 900px) {
   .at-cards { grid-template-columns: repeat(2, 1fr); }
   .at-grid { grid-template-columns: 1fr; }
   .at-settings { grid-template-columns: 1fr 1fr; }
   .at-field-wide { grid-column: span 2; }
 }
-
-/* Decision log filter toggle */
-.at-log-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
-.at-log-head .at-panel-title { margin-bottom: 0; }
-.at-log-right { display: flex; align-items: center; gap: 10px; }
-.at-log-toggle { background: #1a1d27; border: 1px solid #2d3148; color: #9ca3af; padding: 5px 14px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; }
-.at-log-toggle:hover { border-color: #4f6ef7; color: #e2e8f0; }
-.at-log-filters { display: flex; gap: 6px; background: #0f1117; border: 1px solid #2d3148; border-radius: 10px; padding: 4px; }
-.at-filter-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: transparent;
-  border: none;
-  border-radius: 7px;
-  color: #a0aec0;
-  cursor: pointer;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  transition: all 0.15s;
-}
-.at-filter-btn:hover { color: #e2e8f0; }
-.at-filter-btn.active { background: #4f6ef7; color: #fff; }
-.at-filter-count {
-  background: rgba(0,0,0,0.22);
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  min-width: 18px;
-  padding: 1px 6px;
-  text-align: center;
-  line-height: 1.4;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.at-filter-btn:not(.active) .at-filter-count { background: #2d3148; color: #8da2fb; }
 
 /* AI engine failover indicators */
 .at-engines { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-top: 8px; font-size: 0.76rem; }
@@ -981,14 +911,23 @@ body {
 
 /* Scrolling ticker tape */
 .at-tape-wrap { overflow: hidden; background: #12141d; border-bottom: 1px solid #2d3148; padding: 10px 0; margin-bottom: 18px; border-radius: 10px; }
-.at-attribution { color: #6b7280; font-size: 0.65rem; margin: 0 0 0 auto; padding: 0; line-height: 1.4; text-align: right; max-width: 420px; transition: all 0.2s; }
-.at-attribution-wide { flex: 1; max-width: none; font-size: 0.85rem; line-height: 1.6; }
+.at-attribution { color: #f5f7fa; font-size: 0.75rem; margin: 0 0 0 auto; padding: 0; line-height: 1.5; text-align: right; max-width: 420px; transition: all 0.2s; }
+.at-attribution-wide { flex: 1; max-width: none; font-size: 0.95rem; line-height: 1.6; }
 .at-attribution a { color: #4f6ef7; text-decoration: none; }
 .at-attribution a:hover { text-decoration: underline; }
 .at-tape { display: flex; gap: 40px; white-space: nowrap; animation: tape-scroll 30s linear infinite; width: max-content; }
 .at-tape:hover { animation-play-state: paused; }
 @keyframes tape-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-.at-tape-item { display: inline-flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+.at-tape-item { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+.at-tape-clickable { cursor: pointer; }
+.at-tape-tooltip {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%) translateY(4px);
+  background: #1a1d27; border: 1px solid #2d3148; border-radius: 6px;
+  padding: 4px 10px; font-size: 0.72rem; font-weight: 500; color: #e2e8f0;
+  white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s;
+  z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.at-tape-item:hover .at-tape-tooltip { opacity: 1; }
 .at-tape-sym { color: #e2e8f0; font-weight: 700; font-size: 0.9rem; }
 .at-tape-price { color: #e2e8f0; font-family: monospace; font-size: 0.95rem; font-weight: 600; }
 .at-tape-change { font-weight: 700; font-size: 0.85rem; }

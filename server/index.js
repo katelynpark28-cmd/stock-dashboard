@@ -533,17 +533,18 @@ app.post('/api/trader/prices', async (req, res) => {
           yahooFinance.chart(sym, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
         );
         const meta = chart.meta || {};
+        const name = meta.longName || meta.shortName || null;
         const price = meta.regularMarketPrice;
         const prev = meta.chartPreviousClose || meta.previousClose;
         if (price != null && prev != null && prev > 0) {
-          return { symbol: sym, price, change: ((price - prev) / prev) * 100 };
+          return { symbol: sym, name, price, change: ((price - prev) / prev) * 100 };
         }
         const quotes = (chart.quotes || []).filter(q => q.close != null);
-        if (!quotes.length) return { symbol: sym, price: null, change: null };
+        if (!quotes.length) return { symbol: sym, name, price: null, change: null };
         const last = quotes[quotes.length - 1];
         const prevQ = quotes.length > 1 ? quotes[quotes.length - 2] : null;
-        return { symbol: sym, price: last.close, change: prevQ ? ((last.close - prevQ.close) / prevQ.close) * 100 : null };
-      } catch { return { symbol: sym, price: null, change: null }; }
+        return { symbol: sym, name, price: last.close, change: prevQ ? ((last.close - prevQ.close) / prevQ.close) * 100 : null };
+      } catch { return { symbol: sym, name: null, price: null, change: null }; }
     }));
     res.json(results);
   } catch (e) {

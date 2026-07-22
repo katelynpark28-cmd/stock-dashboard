@@ -25,10 +25,12 @@ export default function App() {
   const [view, setView] = useState('trader'); // 'research' | 'trader'
   const debouncedQuery = useDebounce(ticker, 220);
   const wrapperRef = useRef(null);
+  const suppressNextSuggestions = useRef(false);
 
   // Fetch suggestions as user types
   useEffect(() => {
     if (!debouncedQuery || debouncedQuery.length < 1) { setSuggestions([]); return; }
+    if (suppressNextSuggestions.current) { suppressNextSuggestions.current = false; return; }
     fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`)
       .then(r => r.json())
       .then(hits => { setSuggestions(hits); setShowSuggestions(true); })
@@ -49,6 +51,7 @@ export default function App() {
   async function search(sym) {
     const symbol = (typeof sym === 'string' ? sym : ticker).trim().toUpperCase();
     if (!symbol) return;
+    suppressNextSuggestions.current = true;
     setTicker(symbol);
     setShowSuggestions(false);
     setSuggestions([]);
@@ -127,7 +130,7 @@ export default function App() {
 
       <main className="main">
         {view === 'trader' ? (
-          <AutoTrader />
+          <AutoTrader onSelectTicker={(sym) => { setView('research'); search(sym); }} />
         ) : (
           <>
             {!data && !loading && !error && <MarketOverview onSearch={search} />}

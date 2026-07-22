@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import CandlestickChart from './CandlestickChart';
 import RollingNumber from './RollingNumber';
 import {
-  fetchAccount, fetchPositions, fetchOrders, fetchTrader,
+  fetchAccount, fetchPositions, fetchTrader,
   saveTraderConfig, runTraderNow, fetchAtrLevels, fetchCandles, fetchPrices,
 } from '../tradingApi';
 import { fetchPriceHistory } from '../api';
@@ -18,7 +18,7 @@ const timeAgo = (iso) => {
   return `${Math.floor(s / 3600)}h ago`;
 };
 
-export default function AutoTrader() {
+export default function AutoTrader({ onSelectTicker }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginKey, setLoginKey] = useState('');
@@ -26,13 +26,10 @@ export default function AutoTrader() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
-  const [orders, setOrders] = useState([]);
   const [trader, setTrader] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
-  const [logFilter, setLogFilter] = useState('all');
-  const [logVisible, setLogVisible] = useState(true);
   const [candleSymbol, setCandleSymbol] = useState('');
   const [newTicker, setNewTicker] = useState('');
   const [candlePeriod, setCandlePeriod] = useState('1D');
@@ -81,10 +78,10 @@ export default function AutoTrader() {
 
   const refresh = useCallback(async () => {
     try {
-      const [a, p, o, t] = await Promise.all([
-        fetchAccount(), fetchPositions(), fetchOrders(), fetchTrader(),
+      const [a, p, t] = await Promise.all([
+        fetchAccount(), fetchPositions(), fetchTrader(),
       ]);
-      setAccount(a); setPositions(p); setOrders(o); setTrader(t);
+      setAccount(a); setPositions(p); setTrader(t);
       if (!loadedForm.current) {
         setForm({ ...t.config, watchlistText: t.config.watchlist.join(', ') });
         setCandleSymbol(s => s || t.config.watchlist[0] || 'AAPL');
@@ -196,7 +193,6 @@ export default function AutoTrader() {
       perTradeDollars: +form.perTradeDollars,
       maxPositionDollars: +form.maxPositionDollars,
       maxTradesPerDay: +form.maxTradesPerDay,
-      minConfidence: +form.minConfidence,
       stopLossPct: +form.stopLossPct,
       takeProfitPct: +form.takeProfitPct,
       tickerOverrides,
@@ -223,7 +219,6 @@ export default function AutoTrader() {
     perTradeDollars: 2000,
     maxPositionDollars: 60000,
     maxTradesPerDay: 10,
-    minConfidence: 0.6,
     stopLossPct: -3,
     takeProfitPct: 5,
     tickerOverrides: {},
@@ -254,7 +249,6 @@ export default function AutoTrader() {
         perTradeDollars: +updatedForm.perTradeDollars,
         maxPositionDollars: +updatedForm.maxPositionDollars,
         maxTradesPerDay: +updatedForm.maxTradesPerDay,
-        minConfidence: +updatedForm.minConfidence,
         stopLossPct: +updatedForm.stopLossPct,
         takeProfitPct: +updatedForm.takeProfitPct,
         tickerOverrides: overrides,
@@ -293,12 +287,6 @@ export default function AutoTrader() {
 
   const enabled = trader.config.enabled;
 
-  const filteredLog = trader.log.filter(d => {
-    if (logFilter === 'trades') return d.action === 'buy' || d.action === 'sell';
-    if (logFilter === 'hold') return d.action === 'hold';
-    return true;
-  });
-
   const journal = trader.log.filter(d => d.executed);
 
   // Duplicate tape items for seamless scrolling
@@ -310,15 +298,25 @@ export default function AutoTrader() {
       {tapeItems.length > 0 && (
         <div className="at-tape-wrap">
           <div className="at-tape">
-            {tapeItems.map((t, i) => (
-              <span className="at-tape-item" key={i}>
-                <span className="at-tape-sym">{t.symbol === '^GSPC' ? 'S&P 500' : t.symbol === '^DJI' ? 'Dow Jones' : t.symbol === '^IXIC' ? 'NASDAQ' : t.symbol}</span>
-                <span className="at-tape-price">{t.price != null ? `$${t.price.toFixed(2)}` : '—'}</span>
-                <span className={`at-tape-change ${(t.change ?? 0) >= 0 ? 'pos' : 'neg'}`}>
-                  {t.change != null ? `${t.change >= 0 ? '+' : ''}${t.change.toFixed(2)}%` : ''}
+            {tapeItems.map((t, i) => {
+              const isIndex = t.symbol.startsWith('^');
+              const displaySym = t.symbol === '^GSPC' ? 'S&P 500' : t.symbol === '^DJI' ? 'Dow Jones' : t.symbol === '^IXIC' ? 'NASDAQ' : t.symbol;
+              const fullName = isIndex ? displaySym : (t.name || t.symbol);
+              return (
+                <span
+                  className={`at-tape-item ${isIndex ? '' : 'at-tape-clickable'}`}
+                  key={i}
+                  onClick={isIndex ? undefined : () => onSelectTicker?.(t.symbol)}
+                >
+                  <span className="at-tape-sym">{displaySym}</span>
+                  <span className="at-tape-price">{t.price != null ? `$${t.price.toFixed(2)}` : '—'}</span>
+                  <span className={`at-tape-change ${(t.change ?? 0) >= 0 ? 'pos' : 'neg'}`}>
+                    {t.change != null ? `${t.change >= 0 ? '+' : ''}${t.change.toFixed(2)}%` : ''}
+                  </span>
+                  <span className="at-tape-tooltip">{fullName}</span>
                 </span>
-              </span>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -549,11 +547,6 @@ export default function AutoTrader() {
               onChange={e => setForm({ ...form, maxTradesPerDay: e.target.value })} />
           </label>
           <label className="at-field">
-            <span>Min confidence (0–1)</span>
-            <input type="number" min="0" max="1" step="0.05" value={form.minConfidence} disabled={!isAdmin}
-              onChange={e => setForm({ ...form, minConfidence: e.target.value })} />
-          </label>
-          <label className="at-field">
             <span>Stop loss %</span>
             <input type="number" max="0" step="0.5" value={form.stopLossPct} disabled={!isAdmin}
               onChange={e => setForm({ ...form, stopLossPct: e.target.value })} />
@@ -615,60 +608,30 @@ export default function AutoTrader() {
         </div>
       </div>
 
-      <div className="at-grid">
-        {/* Positions */}
-        <div className="at-panel">
-          <h2 className="at-panel-title">Positions ({positions.length})</h2>
-          {positions.length === 0 ? (
-            <p className="at-empty">No open positions.</p>
-          ) : (
-            <table className="at-table">
-              <thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th></tr></thead>
-              <tbody>
-                {positions.map(p => (
-                  <tr key={p.symbol}>
-                    <td className="at-sym">{p.symbol}</td>
-                    <td>{p.qty}</td>
-                    <td>{money(p.avgEntry)}</td>
-                    <td>{money(p.current)}</td>
-                    <td>{money(p.marketValue)}</td>
-                    <td className={p.unrealizedPL >= 0 ? 'pos' : 'neg'}>
-                      {money(p.unrealizedPL)} <small>{pct(p.unrealizedPLPct)}</small>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        {/* Recent orders */}
-        <div className="at-panel">
-          <h2 className="at-panel-title">Recent Orders</h2>
-          {orders.length === 0 ? (
-            <p className="at-empty">No orders yet.</p>
-          ) : (
-            <table className="at-table">
-              <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Value</th><th>Status</th><th>Fill</th></tr></thead>
-              <tbody>
-                {orders.map(o => {
-                  const qty = o.filledQty || o.qty;
-                  const value = o.notional ?? (o.filledQty && o.filledAvgPrice ? o.filledQty * o.filledAvgPrice : null);
-                  return (
-                    <tr key={o.id}>
-                      <td className="at-sym">{o.symbol}</td>
-                      <td className={o.side === 'buy' ? 'pos' : 'neg'}>{o.side}</td>
-                      <td>{qty || '—'}</td>
-                      <td>{value != null ? money(value) : '—'}</td>
-                      <td>{o.status}</td>
-                      <td>{o.filledAvgPrice ? money(o.filledAvgPrice) : '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+      {/* Positions */}
+      <div className="at-panel">
+        <h2 className="at-panel-title">Positions ({positions.length})</h2>
+        {positions.length === 0 ? (
+          <p className="at-empty">No open positions.</p>
+        ) : (
+          <table className="at-table">
+            <thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>Price</th><th>Value</th><th>P&L</th></tr></thead>
+            <tbody>
+              {positions.map(p => (
+                <tr key={p.symbol}>
+                  <td className="at-sym">{p.symbol}</td>
+                  <td>{p.qty}</td>
+                  <td>{money(p.avgEntry)}</td>
+                  <td>{money(p.current)}</td>
+                  <td>{money(p.marketValue)}</td>
+                  <td className={p.unrealizedPL >= 0 ? 'pos' : 'neg'}>
+                    {money(p.unrealizedPL)} <small>{pct(p.unrealizedPLPct)}</small>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Trade journal */}
@@ -693,65 +656,6 @@ export default function AutoTrader() {
             </tbody>
           </table>
         )}
-      </div>
-
-      {/* AI decision log */}
-      <div className="at-panel">
-        <div className="at-log-head">
-          <h2 className="at-panel-title">AI Decision Log</h2>
-          <div className="at-log-right">
-            {logVisible && (
-              <div className="at-log-filters">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'trades', label: 'Buy & Sell' },
-                  { id: 'hold', label: 'Hold' },
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    className={`at-filter-btn ${logFilter === opt.id ? 'active' : ''}`}
-                    onClick={() => setLogFilter(opt.id)}
-                  >
-                    {opt.label}
-                    {opt.id !== 'all' && (
-                      <span className="at-filter-count">
-                        {trader.log.filter(d => opt.id === 'trades'
-                          ? (d.action === 'buy' || d.action === 'sell')
-                          : d.action === 'hold').length}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button className="at-log-toggle" onClick={() => setLogVisible(!logVisible)}>
-              {logVisible ? 'Hide' : 'Show'}
-            </button>
-          </div>
-        </div>
-        {logVisible && (trader.log.length === 0 ? (
-          <p className="at-empty">No decisions yet. Turn the bot on or hit "Run analysis now".</p>
-        ) : filteredLog.length === 0 ? (
-          <p className="at-empty">No {logFilter === 'trades' ? 'buy or sell' : 'hold'} decisions yet.</p>
-        ) : (
-          <div className="at-log">
-            {filteredLog.map((d, i) => (
-              <div className="at-log-row" key={i}>
-                <span className={`at-action at-${d.action}`}>{d.action}</span>
-                <span className="at-log-sym">{d.symbol}</span>
-                <span className="at-log-reason">{d.reason}</span>
-                <span className="at-log-meta">
-                  {d.engine && <span className={`at-engine at-engine-${d.engine.toLowerCase()}`}>{d.engine}</span>}
-                  {d.confidence != null && <span className="at-conf">conf {Math.round(d.confidence * 100)}%</span>}
-                  {d.executed
-                    ? <span className="at-exec">✓ {d.note}</span>
-                    : <span className="at-noexec">{d.note}</span>}
-                  <span className="at-log-time">{timeAgo(d.time)}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        ))}
       </div>
 
       {showLogin && (
