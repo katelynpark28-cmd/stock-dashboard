@@ -692,7 +692,7 @@ body {
 .at-loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 80px; color: #a0aec0; }
 
 .at-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.at-titlebar h1 { font-size: 1.6rem; color: #fff; line-height: 1; margin: 0; transform: translateY(-5px); }
+.at-titlebar h1 { font-size: 1.6rem; color: #fff; line-height: 1; margin: 0; transform: translateY(-10px); }
 .at-titlebar-right { display: flex; align-items: center; gap: 12px; }
 .at-alpaca-link { color: #8da2fb; font-size: 0.82rem; font-weight: 600; text-decoration: none; border: 1px solid #2d3148; padding: 5px 14px; border-radius: 8px; transition: all 0.15s; }
 .at-alpaca-link:hover { border-color: #4f6ef7; color: #e2e8f0; background: rgba(79,110,247,0.1); }
