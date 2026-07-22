@@ -79,15 +79,30 @@ app.get('/api/quote/:symbol', async (req, res) => {
   }
 });
 
+// FMP company profile/ratios don't need Yahoo's crumb token, so they aren't
+// 429'd on Render (unlike quoteSummary(), which powered this endpoint before
+// and made the whole Research page fail in production).
+async function fetchFmpJson(path, symbol) {
+  const key = process.env.VITE_FMP_API_KEY;
+  if (!key) throw new Error('FMP API key missing');
+  const res = await fetch(`https://financialmodelingprep.com/stable/${path}?symbol=${symbol}&apikey=${key}`);
+  if (!res.ok) throw new Error(`FMP error ${res.status}`);
+  const data = await res.json();
+  if (!Array.isArray(data) || !data.length) throw new Error('FMP returned no data');
+  return data[0];
+}
+
 // Company profile + quote (uses chart() for price data to avoid crumb/429 issues)
 app.get('/api/profile/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
-    const [chart, summary] = await Promise.all([
+    const [chart, fmpProfile, ratios, keyMetrics] = await Promise.all([
       cached(`profilechart:${symbol}`, 30000, () =>
         yahooFinance.chart(symbol, { period1: new Date(Date.now() - 5 * 86400000), period2: new Date(), interval: '1d' })
       ),
-      cached(`summary:${symbol}`, 300000, () => yahooFinance.quoteSummary(symbol, { modules: ['assetProfile', 'financialData', 'defaultKeyStatistics'] })),
+      cached(`fmpprofile:${symbol}`, 300000, () => fetchFmpJson('profile', symbol)).catch(() => null),
+      cached(`fmpratios:${symbol}`, 300000, () => fetchFmpJson('ratios-ttm', symbol)).catch(() => null),
+      cached(`fmpkeymetrics:${symbol}`, 300000, () => fetchFmpJson('key-metrics-ttm', symbol)).catch(() => null),
     ]);
     const meta = chart.meta || {};
     const quotes = (chart.quotes || []).filter(q => q.close != null);
@@ -96,6 +111,7 @@ app.get('/api/profile/:symbol', async (req, res) => {
     const quote = {
       symbol,
       shortName: meta.shortName || symbol,
+      longName: fmpProfile?.companyName || meta.longName || meta.shortName || symbol,
       regularMarketPrice: meta.regularMarketPrice || last.close,
       regularMarketChange: prev ? (meta.regularMarketPrice || last.close) - prev : null,
       regularMarketChangePercent: prev ? (((meta.regularMarketPrice || last.close) - prev) / prev) * 100 : null,
@@ -105,11 +121,33 @@ app.get('/api/profile/:symbol', async (req, res) => {
       regularMarketPreviousClose: prev,
       fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh || null,
       fiftyTwoWeekLow: meta.fiftyTwoWeekLow || null,
-      marketCap: meta.marketCap || null,
+      marketCap: meta.marketCap || fmpProfile?.marketCap || null,
       currency: meta.currency || 'USD',
       exchange: meta.exchangeName || meta.fullExchangeName || '',
     };
-    res.json({ quote, assetProfile: summary.assetProfile, financialData: summary.financialData, keyStats: summary.defaultKeyStatistics });
+    const assetProfile = fmpProfile ? {
+      sector: fmpProfile.sector,
+      industry: fmpProfile.industry,
+      longBusinessSummary: fmpProfile.description,
+      website: fmpProfile.website,
+      logoUrl: fmpProfile.image,
+    } : null;
+    const financialData = ratios ? {
+      grossMargins: ratios.grossProfitMarginTTM,
+      operatingMargins: ratios.operatingProfitMarginTTM,
+      profitMargins: ratios.netProfitMarginTTM,
+      returnOnEquity: keyMetrics?.returnOnEquityTTM ?? null,
+    } : null;
+    const keyStats = ratios ? {
+      // *100 here compensates for the frontend dividing debtToEquity by 100
+      // (a holdover from Yahoo's defaultKeyStatistics, which expressed this
+      // as a percentage rather than a plain ratio like FMP does).
+      debtToEquity: ratios.debtToEquityRatioTTM != null ? ratios.debtToEquityRatioTTM * 100 : null,
+      trailingPE: ratios.priceToEarningsRatioTTM,
+      priceToFreeCashflows: ratios.priceToFreeCashFlowRatioTTM,
+      enterpriseToEbitda: ratios.enterpriseValueMultipleTTM,
+    } : null;
+    res.json({ quote, assetProfile, financialData, keyStats });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

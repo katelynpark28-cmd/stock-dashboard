@@ -130,9 +130,9 @@ export async function fetchAll(ticker) {
     sector: ap.sector,
     industry: ap.industry,
     description: ap.longBusinessSummary,
-    image: ap.website
+    image: ap.logoUrl || (ap.website
       ? `https://logo.clearbit.com/${ap.website.replace(/https?:\/\/(www\.)?/, '').split('/')[0]}`
-      : null,
+      : null),
   };
 
   return { income, balance, cashflow, incomeQ, balanceQ, cashflowQ, ratios, profile };
