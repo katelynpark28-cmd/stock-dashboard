@@ -915,7 +915,7 @@ body {
 .at-attribution-wide { flex: 1; max-width: none; font-size: 0.95rem; line-height: 1.6; }
 .at-attribution a { color: #4f6ef7; text-decoration: none; }
 .at-attribution a:hover { text-decoration: underline; }
-.at-tape { display: flex; gap: 40px; white-space: nowrap; animation: tape-scroll 30s linear infinite; width: max-content; }
+.at-tape { display: flex; gap: 10px; white-space: nowrap; animation: tape-scroll 30s linear infinite; width: max-content; }
 .at-tape:hover { animation-play-state: paused; }
 @keyframes tape-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
 .at-tape-item { position: relative; display: inline-flex; align-items: center; gap: 10px; font-size: 0.95rem; }
