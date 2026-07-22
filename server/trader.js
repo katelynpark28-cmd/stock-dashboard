@@ -6,6 +6,7 @@ import Groq from 'groq-sdk';
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { alpaca } from './alpaca.js';
+import { GROWTH_UNIVERSE, rankByVolatility } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(__dirname, 'trader-state.json');
@@ -89,7 +90,7 @@ const DEFAULT_CONFIG = {
   enabled: false,
   watchlist: ['AAPL', 'NVDA', 'TSLA'],
   intervalMinutes: 15,
-  perTradeDollars: 2000,   // dollars per buy order
+  perTradeDollars: 6000,   // dollars per buy order
   maxPositionDollars: 60000, // max total exposure per symbol
   maxTradesPerDay: 10,     // hard cap on orders placed per day
   minConfidence: 0.6,      // ignore AI calls below this confidence
@@ -114,39 +115,24 @@ function today() {
 }
 
 // --- Daily watchlist rotation -------------------------------------------------
-// Pool of liquid, well-known tickers to rotate through so the same handful of
-// symbols isn't shown/traded every single day.
-const WATCHLIST_UNIVERSE = [
-  'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AMD', 'NFLX', 'AVGO',
-  'JPM', 'V', 'MA', 'HD', 'COST', 'PEP', 'KO', 'PG', 'JNJ', 'UNH',
-  'CRM', 'ORCL', 'ADBE', 'QCOM', 'TXN', 'INTC', 'CSCO', 'PYPL', 'SHOP', 'UBER',
-  'DIS', 'NKE', 'SBUX', 'PANW', 'SNOW', 'PLTR', 'COIN', 'SOFI', 'DRAM',
-];
+// Each day the bot re-ranks the high-volatility universe by actual trailing
+// 20-day realized volatility (same metric the "High Growth & Volatile"
+// screener uses) and trades whichever names are currently swinging the most —
+// so the watchlist both changes daily AND reflects real, current volatility
+// rather than a random pick from a static list.
 const WATCHLIST_SIZE = 8;
-
-// Deterministic shuffle seeded by a string (the date), so the pick is stable
-// for a given day but different across days.
-function seededShuffle(arr, seedStr) {
-  let seed = 0;
-  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
-  const rand = () => {
-    seed = (seed + 0x6D2B79F5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
   if (state.watchlistDate === todayStr) return;
-  state.config.watchlist = seededShuffle(WATCHLIST_UNIVERSE, todayStr).slice(0, WATCHLIST_SIZE);
+  try {
+    const ranked = await rankByVolatility(GROWTH_UNIVERSE);
+    if (ranked.length) {
+      state.config.watchlist = ranked.slice(0, WATCHLIST_SIZE).map(r => r.symbol);
+    }
+  } catch (e) {
+    console.error('Watchlist volatility rotation failed, keeping previous watchlist:', e.message);
+  }
   state.watchlistDate = todayStr;
   await saveState();
 }

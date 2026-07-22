@@ -7,6 +7,7 @@ import Groq from 'groq-sdk';
 import 'dotenv/config';
 import { getAccountSummary, getPositions, getRecentOrders } from './alpaca.js';
 import { trader } from './trader.js';
+import { GROWTH_UNIVERSE, STABLE_UNIVERSE, fetchRecentVolatility } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -240,19 +241,11 @@ Respond in this exact JSON format:
   }
 });
 
-// Dynamic screener — ranks by fundamentals + momentum, then uses AI for rationale
-const GROWTH_UNIVERSE = [
-  'MSTR','COIN','HOOD','TSLA','NVDA','AMD','PLTR','SMCI','CRWD','NET',
-  'DDOG','SNOW','SHOP','SPOT','UBER','ARM','META','AMZN','NFLX','CRM',
-  'NOW','ADBE','IONQ','DKNG','RBLX','SOFI','UPST','AXON','CELH','HIMS',
-];
-
-const STABLE_UNIVERSE = [
-  'BRK-B','JNJ','PG','KO','WMT','HD','V','MA','MSFT','AAPL',
-  'UNH','ABBV','MRK','CVX','XOM','LLY','JPM','BAC','GS','WFC',
-  'MCD','PEP','CL','NEE','DUK','T','VZ','COST','TGT','LOW',
-];
-
+// Dynamic screener — ranks purely by current realized volatility (see
+// volatility.js), gated by pass/fail quality filters. Filters must NOT be
+// baked into the sort score as multipliers — that made the sort order
+// diverge from the displayed volatility number, which looked like a bug
+// (list not sorted by the very number shown on each card).
 function scoreGrowth(q) {
   if (q.recentVolatility == null) return 0;
   // Filter out crashed stocks — must be within 35% of 52-week high
@@ -260,9 +253,7 @@ function scoreGrowth(q) {
   if (momentum < 0.65) return 0;
   // Filter out stocks with negative forward EPS
   if (q.epsForward != null && q.epsForward < 0) return 0;
-  // EPS growth bonus: forward EPS > trailing EPS
-  const epsGrowth = (q.epsForward > 0 && q.epsTrailingTwelveMonths > 0 && q.epsForward > q.epsTrailingTwelveMonths) ? 1.4 : 1.0;
-  return q.recentVolatility * momentum * epsGrowth;
+  return q.recentVolatility;
 }
 
 function scoreStable(q) {
@@ -270,38 +261,8 @@ function scoreStable(q) {
   if (q.recentVolatility == null) return 0;
   // Must have positive trailing EPS
   if (q.epsTrailingTwelveMonths != null && q.epsTrailingTwelveMonths <= 0) return 0;
-  // Reward dividend payers
-  const divBonus = q.dividendYield > 0 ? 1.3 : 1.0;
-  // Lower recent volatility = higher score (invert)
-  return (1 / (q.recentVolatility + 1)) * divBonus;
-}
-
-// Realized volatility over the trailing ~20 trading days (annualized stddev
-// of daily log returns), as a percentage. This measures whether a stock is
-// ACTUALLY swinging right now — unlike the 52-week high/low range, which
-// stays "wide" forever after a single one-off spike even if the stock has
-// been flat for months since.
-function annualizedRecentVolatility(closes) {
-  const window = closes.slice(-21); // ~20 return observations
-  if (window.length < 6) return null;
-  const returns = [];
-  for (let i = 1; i < window.length; i++) {
-    if (window[i - 1] > 0 && window[i] > 0) returns.push(Math.log(window[i] / window[i - 1]));
-  }
-  if (returns.length < 5) return null;
-  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-  const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / returns.length;
-  return Math.sqrt(variance) * Math.sqrt(252) * 100;
-}
-
-async function fetchRecentVolatility(symbol) {
-  const chart = await yahooFinance.chart(symbol, {
-    period1: new Date(Date.now() - 45 * 86400000),
-    period2: new Date(),
-    interval: '1d',
-  });
-  const closes = (chart.quotes || []).map(q => q.close).filter(c => c != null && c > 0);
-  return annualizedRecentVolatility(closes);
+  // Lower recent volatility = higher score (invert, still monotonic with volatility)
+  return 1 / (q.recentVolatility + 1);
 }
 
 // FMP quote data doesn't need Yahoo's crumb token, so it isn't 429'd on Render.
