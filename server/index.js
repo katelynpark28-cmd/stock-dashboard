@@ -591,8 +591,26 @@ app.post('/api/auth/verify', (req, res) => {
 
 // --- Alpaca paper trading + auto-trader bot ---------------------------------
 app.get('/api/alpaca/account', async (req, res) => {
-  try { res.json(await getAccountSummary()); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const account = await getAccountSummary();
+    // Alpaca sometimes reports last_equity as 0 (no prior trading-day close
+    // recorded yet for this account), which left Today's P&L either showing
+    // the entire account balance as "today's gain" or, after the earlier
+    // fix, frozen at a flat $0 forever. Fall back to the bot's own first
+    // equity snapshot recorded today as the baseline so it reflects a real,
+    // moving intraday change instead.
+    if (!account.lastEquity) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const history = trader.getState().equityHistory || [];
+      const firstToday = history.find(p => p.time.slice(0, 10) === todayStr);
+      if (firstToday) {
+        account.lastEquity = firstToday.equity;
+        account.dayPL = account.equity - firstToday.equity;
+        account.dayPLPct = firstToday.equity ? (account.dayPL / firstToday.equity) * 100 : 0;
+      }
+    }
+    res.json(account);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/alpaca/positions', async (req, res) => {
