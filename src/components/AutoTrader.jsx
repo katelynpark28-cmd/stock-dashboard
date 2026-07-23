@@ -657,7 +657,6 @@ export default function AutoTrader() {
               return (
                 <div className="at-ovr-row" key={sym}>
                   <TickerLink symbol={sym} name={tickerNames[sym]} className="at-ovr-sym" />
-                  {!inWatchlist && <span className="at-ovr-held" title="Currently held but rotated out of today's watchlist">held</span>}
                   <label className="at-ovr-field">
                     <span>SL %</span>
                     <input type="number" max="0" step="0.5" disabled={!isAdmin}
@@ -672,6 +671,7 @@ export default function AutoTrader() {
                       value={ovr.takeProfitPct ?? ''}
                       onChange={e => setOvr('takeProfitPct', e.target.value)} />
                   </label>
+                  {!inWatchlist && <span className="at-ovr-held" title="Currently held but rotated out of today's watchlist">held</span>}
                 </div>
               );
             })}
