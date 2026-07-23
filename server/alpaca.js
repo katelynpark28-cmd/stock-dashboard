@@ -40,7 +40,7 @@ export async function getAccountSummary() {
     buyingPower: +a.buying_power,
     cash: +a.cash,
     portfolioValue: +a.portfolio_value,
-    dayPL: +a.equity - +a.last_equity,
+    dayPL: +a.last_equity ? +a.equity - +a.last_equity : 0,
     dayPLPct: +a.last_equity ? ((+a.equity - +a.last_equity) / +a.last_equity) * 100 : 0,
     totalPL: +a.equity - 100000,
     totalPLPct: ((+a.equity - 100000) / 100000) * 100,

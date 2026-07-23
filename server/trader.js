@@ -5,7 +5,7 @@ import YahooFinanceClass from 'yahoo-finance2';
 import Groq from 'groq-sdk';
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { alpaca } from './alpaca.js';
+import { alpaca, getPositions } from './alpaca.js';
 import { GROWTH_UNIVERSE, rankByVolatility } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -115,20 +115,25 @@ function today() {
 }
 
 // --- Daily watchlist rotation -------------------------------------------------
-// Each day the bot re-ranks the high-volatility universe by actual trailing
-// 20-day realized volatility (same metric the "High Growth & Volatile"
-// screener uses) and trades whichever names are currently swinging the most —
-// so the watchlist both changes daily AND reflects real, current volatility
-// rather than a random pick from a static list.
+// Currently held positions always stay on the watchlist (so they keep getting
+// fresh data/exit-rule checks no matter how their volatility ranks). The
+// remaining slots, up to WATCHLIST_SIZE total, rotate daily to whichever
+// non-held names are currently swinging the most — re-ranked each day by
+// actual trailing 20-day realized volatility, same metric the "High Growth &
+// Volatile" screener uses, rather than a random pick from a static list.
 const WATCHLIST_SIZE = 8;
 
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
   if (state.watchlistDate === todayStr) return;
   try {
-    const ranked = await rankByVolatility(GROWTH_UNIVERSE);
-    if (ranked.length) {
-      state.config.watchlist = ranked.slice(0, WATCHLIST_SIZE).map(r => r.symbol);
+    const positions = await getPositions();
+    const heldSymbols = positions.map(p => p.symbol);
+    const remainingSlots = Math.max(0, WATCHLIST_SIZE - heldSymbols.length);
+    const ranked = await rankByVolatility(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
+    const newPicks = ranked.slice(0, remainingSlots).map(r => r.symbol);
+    if (heldSymbols.length || newPicks.length) {
+      state.config.watchlist = [...heldSymbols, ...newPicks];
     }
   } catch (e) {
     console.error('Watchlist volatility rotation failed, keeping previous watchlist:', e.message);
