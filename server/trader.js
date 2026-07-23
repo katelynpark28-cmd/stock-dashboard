@@ -116,12 +116,15 @@ function today() {
 
 // --- Daily watchlist rotation -------------------------------------------------
 // Currently held positions always stay on the watchlist (so they keep getting
-// fresh data/exit-rule checks no matter how their volatility ranks). The
-// remaining slots, up to WATCHLIST_SIZE total, rotate daily to whichever
-// non-held names are currently swinging the most — re-ranked each day by
-// actual trailing 20-day realized volatility, same metric the "High Growth &
-// Volatile" screener uses, rather than a random pick from a static list.
-const WATCHLIST_SIZE = 8;
+// fresh data/exit-rule checks no matter how their volatility ranks). On top of
+// that, a fixed number of additional "worth watching" slots rotate daily to
+// whichever non-held names are currently swinging the most — re-ranked each
+// day by actual trailing 20-day realized volatility, same metric the "High
+// Growth & Volatile" screener uses. This count is independent of how many
+// positions are held, so there's always fresh daily rotation on top of
+// whatever you're holding, rather than rotation shrinking to zero once
+// holdings fill a fixed total size.
+const ROTATING_PICKS = 5;
 
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
@@ -129,9 +132,8 @@ async function rotateWatchlistIfNeeded() {
   try {
     const positions = await getPositions();
     const heldSymbols = positions.map(p => p.symbol);
-    const remainingSlots = Math.max(0, WATCHLIST_SIZE - heldSymbols.length);
     const ranked = await rankByVolatility(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
-    const newPicks = ranked.slice(0, remainingSlots).map(r => r.symbol);
+    const newPicks = ranked.slice(0, ROTATING_PICKS).map(r => r.symbol);
     if (heldSymbols.length || newPicks.length) {
       state.config.watchlist = [...heldSymbols, ...newPicks];
     }
