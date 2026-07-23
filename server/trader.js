@@ -502,6 +502,11 @@ function scheduleLoop() {
 // --- Public API --------------------------------------------------------------
 export const trader = {
   async init() {
+    if (REDIS_URL && REDIS_TOKEN) {
+      console.log('Trader state persistence: Upstash Redis (survives restarts)');
+    } else {
+      console.log('Trader state persistence: LOCAL FILE ONLY — UPSTASH_REDIS_REST_URL/TOKEN not set, state will reset on every restart/redeploy');
+    }
     await loadState();
     await rotateWatchlistIfNeeded();
     scheduleLoop();
