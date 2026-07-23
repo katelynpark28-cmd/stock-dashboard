@@ -252,8 +252,12 @@ export default function AutoTrader() {
 
   async function saveSettings() {
     const watchlist = form.watchlistText.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    // Rebuild overrides from every symbol currently in form state (watchlist
+    // + held positions), not just the watchlist — otherwise a held-but-
+    // unlisted symbol's override would be silently dropped on save.
+    const overrideSymbols = new Set([...watchlist, ...Object.keys(form.tickerOverrides || {})]);
     const tickerOverrides = {};
-    for (const sym of watchlist) {
+    for (const sym of overrideSymbols) {
       const ovr = form.tickerOverrides?.[sym];
       if (ovr && (ovr.stopLossPct !== '' || ovr.takeProfitPct !== '')) {
         tickerOverrides[sym] = {};
@@ -299,13 +303,16 @@ export default function AutoTrader() {
   };
 
   async function autoSetFromATR() {
-    const watchlist = trader.config.watchlist;
-    if (!watchlist.length) return;
+    // Include currently held positions even if they've rotated out of the
+    // watchlist, so their exit rules still get refreshed by this button —
+    // otherwise a held-but-unlisted symbol's SL/TP would silently go stale.
+    const symbols = [...new Set([...trader.config.watchlist, ...positions.map(p => p.symbol)])];
+    if (!symbols.length) return;
     setAtrLoading(true);
     try {
-      const levels = await fetchAtrLevels(watchlist);
+      const levels = await fetchAtrLevels(symbols);
       const overrides = { ...(form.tickerOverrides || {}) };
-      for (const sym of watchlist) {
+      for (const sym of symbols) {
         if (levels[sym]) {
           overrides[sym] = {
             ...(overrides[sym] || {}),
