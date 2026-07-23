@@ -643,19 +643,21 @@ export default function AutoTrader() {
           <div className="at-overrides-head">
             <div>
               <h3 className="at-overrides-title">Per-Ticker Exit Rules</h3>
-              <p className="at-overrides-sub">Leave blank to use the global defaults above. Changes save automatically.</p>
+              <p className="at-overrides-sub">Leave blank to use the global defaults above. Changes save automatically. Currently held stocks always show here, even if rotated out of today's watchlist.</p>
             </div>
             {isAdmin && <button className="at-atr-btn" onClick={autoSetFromATR} disabled={atrLoading}>
               {atrLoading ? 'Calculating…' : 'Auto-set from volatility'}
             </button>}
           </div>
           <div className="at-overrides-grid">
-            {trader.config.watchlist.map(sym => {
+            {[...new Set([...trader.config.watchlist, ...positions.map(p => p.symbol)])].map(sym => {
               const ovr = form.tickerOverrides?.[sym] || {};
               const setOvr = (field, val) => setTickerOverride(sym, field, val);
+              const inWatchlist = trader.config.watchlist.includes(sym);
               return (
                 <div className="at-ovr-row" key={sym}>
                   <TickerLink symbol={sym} name={tickerNames[sym]} className="at-ovr-sym" />
+                  {!inWatchlist && <span className="at-ovr-held" title="Currently held but rotated out of today's watchlist">held</span>}
                   <label className="at-ovr-field">
                     <span>SL %</span>
                     <input type="number" max="0" step="0.5" disabled={!isAdmin}
