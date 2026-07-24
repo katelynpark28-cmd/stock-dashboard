@@ -1,0 +1,25 @@
+name: Keep bot alive and running
+
+# Render's free tier spins down the server after ~15 minutes of no
+# incoming web traffic, which kills the bot's in-process setInterval
+# scheduler along with it. This workflow pings the deployed site's
+# trader run endpoint on a schedule, which both keeps the instance
+# awake and directly triggers a bot cycle — more reliable than hoping
+# the internal timer survives repeated cold starts. It costs nothing:
+# GitHub Actions gives generous free scheduled-workflow minutes.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger a trader run cycle
+        run: |
+          curl -sf -X POST https://stock-dashboard-mzo0.onrender.com/api/trader/run \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            -o /dev/null \
+            || echo "Ping failed (server may have been cold-starting) — not fatal, next scheduled run will retry."
