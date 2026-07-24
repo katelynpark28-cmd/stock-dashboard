@@ -108,7 +108,14 @@ let state = {
   lastRunNote: null,
   running: false,
   watchlistDate: null,     // last date the watchlist was auto-rotated
+  lastBuyTime: {},         // { SYMBOL: ISO timestamp of last executed buy } — enforces BUY_COOLDOWN_MS
 };
+
+// Minimum time between consecutive buys of the SAME symbol. Without this,
+// a stock the AI keeps rating "buy" on back-to-back cycles gets bought again
+// every single cycle, letting one position balloon to dominate the portfolio
+// (seen in practice: 10 buys of one symbol in ~3.5 hours, ~44% of equity).
+const BUY_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -174,13 +181,14 @@ async function loadState() {
     state.trades = raw.trades && raw.trades.date === today() ? raw.trades : { date: today(), count: 0 };
     state.equityHistory = raw.equityHistory || [];
     state.watchlistDate = raw.watchlistDate || null;
+    state.lastBuyTime = raw.lastBuyTime || {};
   } catch (e) {
     console.error('Failed to load trader state (first run is normal):', e.message);
   }
 }
 
 async function saveState() {
-  const payload = { config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate };
+  const payload = { config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
   try {
     if (REDIS_URL && REDIS_TOKEN) {
       await redisSetState(payload);
@@ -380,6 +388,11 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
   }
 
   if (decision.action === 'buy') {
+    const lastBuy = state.lastBuyTime[snap.symbol];
+    if (lastBuy && Date.now() - new Date(lastBuy).getTime() < BUY_COOLDOWN_MS) {
+      const mins = Math.ceil((BUY_COOLDOWN_MS - (Date.now() - new Date(lastBuy).getTime())) / 60000);
+      return { executed: false, note: `buy cooldown active (~${mins}m left)` };
+    }
     const currentExposure = position ? position.marketValue : 0;
     const room = config.maxPositionDollars - currentExposure;
     if (room <= 1) return { executed: false, note: 'at max position size for symbol' };
@@ -395,6 +408,7 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
       time_in_force: 'day',
     });
     state.trades.count++;
+    state.lastBuyTime[snap.symbol] = new Date().toISOString();
     return { executed: true, note: `bought ~$${size.toFixed(0)}` };
   }
 
