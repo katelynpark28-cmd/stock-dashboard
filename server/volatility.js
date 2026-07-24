@@ -55,3 +55,30 @@ export async function rankByVolatility(universe) {
     .filter(s => s.volatility != null)
     .sort((a, b) => b.volatility - a.volatility);
 }
+
+// ATR(14)-based stop-loss/take-profit suggestion per symbol — wider exits for
+// choppier stocks, tighter for calmer ones. Shared by the manual "Auto-set
+// from volatility" button and the bot's automatic daily refresh.
+export async function computeAtrLevels(symbols) {
+  const period1 = new Date(Date.now() - 30 * 86400000);
+  const results = {};
+  await Promise.all(symbols.map(async (sym) => {
+    try {
+      const chart = await yahooFinance.chart(sym, { period1, period2: new Date(), interval: '1d' });
+      const quotes = (chart.quotes || []).filter(q => q.high != null && q.low != null && q.close != null);
+      if (quotes.length < 15) return;
+      const trs = [];
+      for (let i = 1; i < quotes.length; i++) {
+        const h = quotes[i].high, l = quotes[i].low, pc = quotes[i - 1].close;
+        trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+      }
+      const atr14 = trs.slice(-14).reduce((a, b) => a + b, 0) / Math.min(14, trs.slice(-14).length);
+      const price = quotes[quotes.length - 1].close;
+      const atrPct = (atr14 / price) * 100;
+      const sl = +(atrPct * -2).toFixed(1);
+      const tp = +(atrPct * 4).toFixed(1);
+      results[sym] = { atr: +atr14.toFixed(2), atrPct: +atrPct.toFixed(2), stopLossPct: sl, takeProfitPct: tp };
+    } catch {}
+  }));
+  return results;
+}

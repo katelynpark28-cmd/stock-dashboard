@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { alpaca, getPositions } from './alpaca.js';
-import { GROWTH_UNIVERSE, rankByVolatility } from './volatility.js';
+import { GROWTH_UNIVERSE, rankByVolatility, computeAtrLevels } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(__dirname, 'trader-state.json');
@@ -136,6 +136,25 @@ async function rotateWatchlistIfNeeded() {
     const newPicks = ranked.slice(0, ROTATING_PICKS).map(r => r.symbol);
     if (heldSymbols.length || newPicks.length) {
       state.config.watchlist = [...heldSymbols, ...newPicks];
+    }
+    // Auto-refresh ATR-based stop-loss/take-profit for the day's full
+    // watchlist, same calculation as the manual "Auto-set from volatility"
+    // button — so exit rules are fresh for the day's tickers without
+    // needing to click it, and stay put (not recomputed again) until the
+    // next rotation.
+    if (state.config.watchlist.length) {
+      const levels = await computeAtrLevels(state.config.watchlist);
+      const overrides = { ...state.config.tickerOverrides };
+      for (const sym of state.config.watchlist) {
+        if (levels[sym]) {
+          overrides[sym] = {
+            ...(overrides[sym] || {}),
+            stopLossPct: levels[sym].stopLossPct,
+            takeProfitPct: levels[sym].takeProfitPct,
+          };
+        }
+      }
+      state.config.tickerOverrides = overrides;
     }
   } catch (e) {
     console.error('Watchlist volatility rotation failed, keeping previous watchlist:', e.message);
