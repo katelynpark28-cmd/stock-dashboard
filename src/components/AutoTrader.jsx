@@ -625,16 +625,6 @@ export default function AutoTrader() {
             <input type="number" min="1" value={form.maxTradesPerDay} disabled={!isAdmin}
               onChange={e => setForm({ ...form, maxTradesPerDay: e.target.value })} />
           </label>
-          <label className="at-field">
-            <span>Stop loss %</span>
-            <input type="number" max="0" step="0.5" value={form.stopLossPct} disabled={!isAdmin}
-              onChange={e => setForm({ ...form, stopLossPct: e.target.value })} />
-          </label>
-          <label className="at-field">
-            <span>Take profit %</span>
-            <input type="number" min="0" step="0.5" value={form.takeProfitPct} disabled={!isAdmin}
-              onChange={e => setForm({ ...form, takeProfitPct: e.target.value })} />
-          </label>
           {isAdmin && <div className="at-settings-actions">
             <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
               {saving ? 'Saving…' : 'Save settings'}
