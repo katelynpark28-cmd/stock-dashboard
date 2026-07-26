@@ -895,20 +895,6 @@ body {
 .at-engine-chip.on { background: rgba(52,211,153,0.14); color: #34d399; }
 .at-engine-chip.off { background: #2d3148; color: #6b7280; }
 
-.at-engine {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: #2d3148;
-  color: #a0aec0;
-}
-.at-engine-groq { background: rgba(244,114,52,0.16); color: #fb9a4b; }
-.at-engine-cerebras { background: rgba(79,110,247,0.16); color: #8da2fb; }
-.at-engine-gemini { background: rgba(167,139,250,0.16); color: #c4b5fd; }
-
 /* Scrolling ticker tape */
 .at-tape-wrap { overflow: hidden; background: #12141d; border-bottom: 1px solid #2d3148; padding: 10px 0; margin-bottom: 18px; border-radius: 10px; }
 .at-attribution { color: #f5f7fa; font-size: 0.75rem; margin: 0 0 0 auto; padding: 0; line-height: 1.5; text-align: right; max-width: 420px; transition: all 0.2s; }

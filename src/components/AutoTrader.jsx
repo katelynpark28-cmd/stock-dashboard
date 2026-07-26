@@ -717,7 +717,7 @@ export default function AutoTrader() {
           <p className="at-empty">No executed trades yet.</p>
         ) : (
           <table className="at-table">
-            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Price</th><th>Engine</th></tr></thead>
+            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Price</th></tr></thead>
             <tbody>
               {journal.map((d, i) => (
                 <tr key={i}>
@@ -726,7 +726,6 @@ export default function AutoTrader() {
                   <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
                   <td>{d.note}</td>
                   <td>{money(d.price)}</td>
-                  <td>{d.engine && <span className={`at-engine at-engine-${d.engine.toLowerCase()}`}>{d.engine}</span>}</td>
                 </tr>
               ))}
             </tbody>
