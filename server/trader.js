@@ -596,11 +596,16 @@ export const trader = {
     await saveState();
     scheduleLoop();
     const result = this.getState();
+    result._debug.hasRedisEnv = !!(REDIS_URL && REDIS_TOKEN);
     try {
-      const verify = REDIS_URL && REDIS_TOKEN ? await redisGetState() : null;
-      result._debug.verifyReadBack = verify ? verify.config.minConfidence : 'no-redis';
+      if (REDIS_URL && REDIS_TOKEN) {
+        const verify = await redisGetState();
+        result._debug.verifyReadBack = verify ? verify.config.minConfidence : 'redisGetState returned null';
+      } else {
+        result._debug.verifyReadBack = 'skipped, no redis env';
+      }
     } catch (e) {
-      result._debug.verifyReadBack = `error: ${e.message}`;
+      result._debug.verifyReadBack = `threw: ${e.message}`;
     }
     return result;
   },
