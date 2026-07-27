@@ -36,11 +36,15 @@ async function redisGetState() {
 }
 
 async function redisSetState(value) {
-  await fetch(`${REDIS_URL}/set/${REDIS_KEY}`, {
+  const res = await fetch(`${REDIS_URL}/set/${REDIS_KEY}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'text/plain' },
     body: JSON.stringify(value),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Upstash SET failed: HTTP ${res.status} ${body.slice(0, 300)}`);
+  }
 }
 
 const yahooFinance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
@@ -199,6 +203,8 @@ async function loadState() {
   }
 }
 
+let lastSaveError = null;
+let lastSaveTime = null;
 async function saveState() {
   const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
   try {
@@ -207,8 +213,11 @@ async function saveState() {
     } else {
       fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2));
     }
+    lastSaveError = null;
+    lastSaveTime = new Date().toISOString();
   } catch (e) {
     console.error('Failed to save trader state:', e.message);
+    lastSaveError = e.message;
   }
 }
 
@@ -567,7 +576,7 @@ export const trader = {
   },
   getState() {
     return {
-      _debug: { redisKey: REDIS_KEY, renderEnv: process.env.RENDER ?? null },
+      _debug: { redisKey: REDIS_KEY, renderEnv: process.env.RENDER ?? null, lastSaveError, lastSaveTime },
       config: state.config,
       log: state.log,
       executedTrades: state.executedTrades,
