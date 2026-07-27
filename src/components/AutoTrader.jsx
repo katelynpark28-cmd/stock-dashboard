@@ -368,7 +368,7 @@ export default function AutoTrader() {
 
   const enabled = trader.config.enabled;
 
-  const journal = trader.log.filter(d => d.executed);
+  const journal = trader.executedTrades || [];
 
   // Duplicate tape items for seamless scrolling
   const tapeItems = tickerPrices.length > 0 ? [...tickerPrices, ...tickerPrices] : [];

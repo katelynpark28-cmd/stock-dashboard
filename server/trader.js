@@ -17,7 +17,15 @@ const STATE_FILE = path.join(__dirname, 'trader-state.json');
 // local JSON file for local dev where these env vars aren't set.
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-const REDIS_KEY = 'stockp:trader-state';
+// Render automatically sets RENDER=true on every deployed service, so this
+// reliably tells local dev apart from production even if the same Upstash
+// credentials are present in both .env files (as they are here, so Redis
+// persistence can be tested locally). Without this, a local server run could
+// silently read/overwrite the SAME live production state a real deployment is
+// using — which happened once: a local test run's fresh, near-empty state
+// got written to the shared key while production was still live, and was
+// only caught and fixed by manually forcing production to re-save itself.
+const REDIS_KEY = process.env.RENDER ? 'stockp:trader-state' : 'stockp:trader-state:local-dev';
 
 async function redisGetState() {
   const res = await fetch(`${REDIS_URL}/get/${REDIS_KEY}`, {
@@ -101,7 +109,8 @@ const DEFAULT_CONFIG = {
 
 let state = {
   config: { ...DEFAULT_CONFIG },
-  log: [],                 // newest-first decision log
+  log: [],                 // newest-first decision log (mostly "hold" noise)
+  executedTrades: [],       // newest-first, executed trades ONLY — what Trade Journal reads
   trades: { date: today(), count: 0 },
   equityHistory: [],       // [{ time, equity }] for the performance curve
   lastRun: null,
@@ -178,6 +187,9 @@ async function loadState() {
     if (!raw) return;
     state.config = { ...DEFAULT_CONFIG, ...(raw.config || {}) };
     state.log = raw.log || [];
+    // Backfill from the old shared log on first load after this change, so
+    // trades already executed before the split aren't lost.
+    state.executedTrades = raw.executedTrades || (raw.log || []).filter(e => e.executed);
     state.trades = raw.trades && raw.trades.date === today() ? raw.trades : { date: today(), count: 0 };
     state.equityHistory = raw.equityHistory || [];
     state.watchlistDate = raw.watchlistDate || null;
@@ -188,7 +200,7 @@ async function loadState() {
 }
 
 async function saveState() {
-  const payload = { config: state.config, log: state.log.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
+  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
   try {
     if (REDIS_URL && REDIS_TOKEN) {
       await redisSetState(payload);
@@ -201,8 +213,19 @@ async function saveState() {
 }
 
 async function addLog(entry) {
-  state.log.unshift({ time: new Date().toISOString(), ...entry });
+  const withTime = { time: new Date().toISOString(), ...entry };
+  state.log.unshift(withTime);
   state.log = state.log.slice(0, 200);
+  // Trade Journal reads from its own list, capped independently of the
+  // decision log. Sharing one 200-slot array meant every "hold" decision
+  // (the vast majority of entries) could silently push executed trades out
+  // of the visible history within hours once the bot ran on a reliable
+  // schedule — executed trades now persist on their own regardless of how
+  // much hold-decision volume accumulates.
+  if (withTime.executed) {
+    state.executedTrades.unshift(withTime);
+    state.executedTrades = state.executedTrades.slice(0, 200);
+  }
   await saveState();
 }
 
@@ -546,6 +569,7 @@ export const trader = {
     return {
       config: state.config,
       log: state.log,
+      executedTrades: state.executedTrades,
       trades: state.trades,
       lastRun: state.lastRun,
       lastRunNote: state.lastRunNote,
