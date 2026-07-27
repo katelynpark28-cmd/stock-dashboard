@@ -93,7 +93,7 @@ const DEFAULT_CONFIG = {
   perTradeDollars: 6000,   // dollars per buy order
   maxPositionDollars: 60000, // max total exposure per symbol
   maxTradesPerDay: 10,     // hard cap on orders placed per day
-  minConfidence: 0.6,      // symmetric buy/sell threshold for the weighted score (|score| must clear this either direction)
+  minConfidence: 0.5,      // symmetric buy/sell threshold for the weighted score (|score| must clear this either direction)
   stopLossPct: -3,         // auto-sell if position drops this % (negative number)
   takeProfitPct: 5,        // auto-sell if position gains this %
   tickerOverrides: {},     // per-ticker overrides, e.g. { TSLA: { stopLossPct: -5, takeProfitPct: 8 } }
