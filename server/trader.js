@@ -203,8 +203,6 @@ async function loadState() {
   }
 }
 
-let lastSaveError = null;
-let lastSaveTime = null;
 async function saveState() {
   const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
   try {
@@ -213,11 +211,8 @@ async function saveState() {
     } else {
       fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2));
     }
-    lastSaveError = null;
-    lastSaveTime = new Date().toISOString();
   } catch (e) {
     console.error('Failed to save trader state:', e.message);
-    lastSaveError = e.message;
   }
 }
 
@@ -576,7 +571,6 @@ export const trader = {
   },
   getState() {
     return {
-      _debug: { redisKey: REDIS_KEY, renderEnv: process.env.RENDER ?? null, lastSaveError, lastSaveTime },
       config: state.config,
       log: state.log,
       executedTrades: state.executedTrades,
@@ -595,19 +589,7 @@ export const trader = {
     state.config.intervalMinutes = Math.max(1, Math.min(240, +state.config.intervalMinutes || 15));
     await saveState();
     scheduleLoop();
-    const result = this.getState();
-    result._debug.hasRedisEnv = !!(REDIS_URL && REDIS_TOKEN);
-    try {
-      if (REDIS_URL && REDIS_TOKEN) {
-        const verify = await redisGetState();
-        result._debug.verifyReadBack = verify ? verify.config.minConfidence : 'redisGetState returned null';
-      } else {
-        result._debug.verifyReadBack = 'skipped, no redis env';
-      }
-    } catch (e) {
-      result._debug.verifyReadBack = `threw: ${e.message}`;
-    }
-    return result;
+    return this.getState();
   },
   async runNow() {
     await runOnce(true);

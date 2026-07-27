@@ -14,6 +14,11 @@ dist-ssr
 .env
 .claude
 
+# Local fallback for trader state when Redis env vars aren't set. Must never
+# be committed — a stale snapshot here gets deployed fresh on every redeploy,
+# silently overwriting the live bot's real trade history.
+server/trader-state.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
