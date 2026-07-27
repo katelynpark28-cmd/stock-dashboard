@@ -567,6 +567,7 @@ export const trader = {
   },
   getState() {
     return {
+      _debug: { redisKey: REDIS_KEY, renderEnv: process.env.RENDER ?? null },
       config: state.config,
       log: state.log,
       executedTrades: state.executedTrades,
