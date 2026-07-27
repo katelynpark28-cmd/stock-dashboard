@@ -595,7 +595,14 @@ export const trader = {
     state.config.intervalMinutes = Math.max(1, Math.min(240, +state.config.intervalMinutes || 15));
     await saveState();
     scheduleLoop();
-    return this.getState();
+    const result = this.getState();
+    try {
+      const verify = REDIS_URL && REDIS_TOKEN ? await redisGetState() : null;
+      result._debug.verifyReadBack = verify ? verify.config.minConfidence : 'no-redis';
+    } catch (e) {
+      result._debug.verifyReadBack = `error: ${e.message}`;
+    }
+    return result;
   },
   async runNow() {
     await runOnce(true);
