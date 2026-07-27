@@ -93,7 +93,7 @@ const DEFAULT_CONFIG = {
   perTradeDollars: 6000,   // dollars per buy order
   maxPositionDollars: 60000, // max total exposure per symbol
   maxTradesPerDay: 10,     // hard cap on orders placed per day
-  minConfidence: 0.6,      // ignore AI calls below this confidence
+  minConfidence: 0.6,      // symmetric buy/sell threshold for the weighted score (|score| must clear this either direction)
   stopLossPct: -3,         // auto-sell if position drops this % (negative number)
   takeProfitPct: 5,        // auto-sell if position gains this %
   tickerOverrides: {},     // per-ticker overrides, e.g. { TSLA: { stopLossPct: -5, takeProfitPct: 8 } }
@@ -264,112 +264,104 @@ async function buildSnapshot(symbol) {
   };
 }
 
-// --- Candlestick pattern rules (run before AI) ------------------------------
-function detectPatterns(snap, position) {
-  const candles = snap.candles;
-  if (!candles || candles.length < 3) return null;
-  if (snap.sma50 == null || snap.rsi14 == null) return null;
+// --- Weighted signal scoring --------------------------------------------------
+// Every signal is scored on the same -1 (bearish) to +1 (bullish) scale, then
+// combined via fixed weights into one number in [-1, 1]. Buy/sell requires
+// clearing config.minConfidence in either direction — the SAME threshold both
+// ways, so bullish and bearish evidence are held to an identical bar. This
+// replaces the old setup where a hardcoded pattern rule could unilaterally
+// force a sell regardless of what the rest of the evidence said (that's what
+// caused a stock to get bought and sold again within ~15 minutes once).
+const WEIGHTS = { rsi: 0.25, trend: 0.25, momentum: 0.15, pattern: 0.20, news: 0.15 };
 
+function clip(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function scoreRSI(rsi14) {
+  if (rsi14 == null) return 0;
+  return clip((50 - rsi14) / 20, -1, 1); // RSI 30 -> +1 (oversold/bullish), RSI 70 -> -1 (overbought/bearish)
+}
+
+function scoreTrend(price, sma50) {
+  if (!sma50 || price == null) return 0;
+  return clip(((price - sma50) / sma50) / 0.05, -1, 1); // +-5% off SMA50 maxes out the score
+}
+
+function scoreMomentum(momentum5d) {
+  if (momentum5d == null) return 0;
+  return clip(momentum5d / 10, -1, 1); // +-10% 5-day move maxes out the score
+}
+
+// Pure shape-based candlestick scoring — deliberately mirrored (a bullish shape
+// and its bearish mirror both count) and decoupled from RSI/trend, which are
+// already scored separately above and would otherwise be double-counted.
+function scorePattern(snap) {
+  const candles = snap.candles;
+  if (!candles || candles.length < 3) return 0;
   const latest = candles[candles.length - 1];
   const prev = candles[candles.length - 2];
-  const price = snap.price;
-  const rsi = snap.rsi14;
+  let bullish = 0, bearish = 0;
 
-  // 1. Bullish engulfing + price near/above SMA50 + RSI < 40 → Buy
-  const bullEngulf = prev.c < prev.o
-    && latest.c > latest.o
-    && latest.o <= prev.c
-    && latest.c >= prev.o;
-  if (bullEngulf && price >= snap.sma50 * 0.98 && rsi < 40) {
-    return { action: 'buy', confidence: 0.8, reason: `Bullish engulfing near SMA50, RSI ${rsi.toFixed(0)} oversold`, engine: 'Pattern' };
-  }
+  const bullEngulf = prev.c < prev.o && latest.c > latest.o && latest.o <= prev.c && latest.c >= prev.o;
+  const bearEngulf = prev.c > prev.o && latest.c < latest.o && latest.o >= prev.c && latest.c <= prev.o;
+  if (bullEngulf) bullish++;
+  if (bearEngulf) bearish++;
 
-  // 2. Hammer + price above SMA50 + RSI < 35 → Buy
   const body = Math.abs(latest.c - latest.o);
   const lowerWick = Math.min(latest.o, latest.c) - latest.l;
   const upperWick = latest.h - Math.max(latest.o, latest.c);
-  const hammer = body > 0 && lowerWick >= body * 2 && upperWick <= body * 0.5;
-  if (hammer && price >= snap.sma50 && rsi < 35) {
-    return { action: 'buy', confidence: 0.75, reason: `Hammer candle above SMA50, RSI ${rsi.toFixed(0)} oversold`, engine: 'Pattern' };
-  }
+  if (body > 0 && lowerWick >= body * 2 && upperWick <= body * 0.5) bullish++; // Hammer
+  if (body > 0 && upperWick >= body * 2 && lowerWick <= body * 0.5) bearish++; // Shooting Star
 
-  // 3. Bearish engulfing + price below SMA50 + RSI > 60 → Sell (only if holding)
-  const bearEngulf = prev.c > prev.o
-    && latest.c < latest.o
-    && latest.o >= prev.c
-    && latest.c <= prev.o;
-  if (bearEngulf && price < snap.sma50 && rsi > 60 && position) {
-    return { action: 'sell', confidence: 0.8, reason: `Bearish engulfing below SMA50, RSI ${rsi.toFixed(0)}`, engine: 'Pattern' };
-  }
-
-  // 4. Three red candles with declining closes + price below SMA50 → Sell (only if holding)
   const last3 = candles.slice(-3);
-  const threeRed = last3.every(c => c.c < c.o);
-  const declining = last3[0].c > last3[1].c && last3[1].c > last3[2].c;
-  if (threeRed && declining && price < snap.sma50 && position) {
-    return { action: 'sell', confidence: 0.75, reason: `3 red candles declining below SMA50`, engine: 'Pattern' };
+  if (last3.length === 3) {
+    if (last3.every(c => c.c > c.o) && last3[0].c < last3[1].c && last3[1].c < last3[2].c) bullish++; // 3 rising green
+    if (last3.every(c => c.c < c.o) && last3[0].c > last3[1].c && last3[1].c > last3[2].c) bearish++; // 3 declining red
   }
 
-  return null;
+  return clip(bullish - bearish, -1, 1);
 }
 
-// --- AI decision -------------------------------------------------------------
-const f = (n, d = 2) => (n == null ? 'N/A' : n.toFixed(d));
-
-async function decide(snap, position) {
-  const posLine = position
-    ? `HOLDING ${position.qty} shares @ avg $${f(position.avgEntry)}, unrealized P&L ${f(position.unrealizedPLPct)}%`
-    : 'No current position';
-  const newsLine = (snap.news && snap.news.length)
-    ? snap.news.map(t => `- ${t}`).join('\n')
-    : '(no recent headlines)';
-  const candleLine = (snap.candles && snap.candles.length)
-    ? snap.candles.map(c => `${c.date}: O=${c.o} H=${c.h} L=${c.l} C=${c.c}`).join('\n')
-    : '(no candle data)';
-
-  const prompt = `You are a disciplined systematic trading assistant running a PAPER account (fake money).
-Decide an action for ${snap.symbol} based ONLY on this technical snapshot. Do not invent data.
-
-Price: $${f(snap.price)} | Today: ${f(snap.changePct)}%
-SMA20: $${f(snap.sma20)} | SMA50: $${f(snap.sma50)}
-RSI(14): ${f(snap.rsi14, 1)}
-From 52w high: ${f(snap.pctFromHigh52, 1)}% | From 52w low: ${f(snap.pctFromLow52, 1)}%
-5-day momentum: ${f(snap.momentum5d, 1)}%
-Position: ${posLine}
-
-Last 5 daily candles (OHLC):
-${candleLine}
-
-Recent headlines:
-${newsLine}
-
-Guidelines (heuristics, not guarantees): oversold RSI<30 while price holds above SMA50 can be a buy;
-overbought RSI>70 or a break below SMA50 can be a sell; respect the prevailing trend; prefer "hold" when mixed.
-Also weigh the headlines: clearly negative news is a reason for caution even on good technicals; a positive catalyst can support a buy.
-Check the candle shapes for reversal or continuation patterns (e.g. hammer, doji, engulfing, shooting star). These can confirm or contradict the other signals.
-Only suggest "sell" if there is a position to sell.
-
-Respond as JSON: {"action":"buy|sell|hold","confidence":0.0-1.0,"reason":"<=20 words, specific to these numbers"}`;
-
-  // Try each engine in order; on rate-limit/cooldown/error, fall through to the next.
-  let lastErr;
+// The only remaining AI call: score headline sentiment from -1 to +1. Kept
+// deliberately small/cheap, and fails soft (0 = neutral) instead of throwing,
+// so an AI outage no longer blocks the bot from deciding at all — it just
+// proceeds on technicals alone.
+async function scoreNews(snap) {
+  if (!snap.news || !snap.news.length) return 0;
+  const prompt = `Rate the sentiment of these headlines about ${snap.symbol} for a trader, from -1 (very negative) to +1 (very positive), 0 if neutral/mixed/no clear signal:\n${snap.news.map(t => `- ${t}`).join('\n')}\n\nRespond as JSON: {"sentiment": <number from -1.0 to 1.0>}`;
   for (const eng of ENGINES) {
     if (!eng.available()) continue;
     try {
       const raw = await eng.fn(prompt);
       const out = JSON.parse(raw);
-      return {
-        action: ['buy', 'sell', 'hold'].includes(out.action) ? out.action : 'hold',
-        confidence: typeof out.confidence === 'number' ? Math.max(0, Math.min(1, out.confidence)) : 0,
-        reason: String(out.reason || '').slice(0, 160),
-        engine: eng.name,
-      };
-    } catch (e) {
-      lastErr = e;
-      // move to the next engine in the chain
+      if (typeof out.sentiment === 'number') return clip(out.sentiment, -1, 1);
+    } catch {
+      // try the next engine
     }
   }
-  throw new Error(`all engines failed (last: ${lastErr?.message || 'unknown'})`);
+  return 0;
+}
+
+async function decide(snap, position) {
+  const rsiScore = scoreRSI(snap.rsi14);
+  const trendScore = scoreTrend(snap.price, snap.sma50);
+  const momentumScore = scoreMomentum(snap.momentum5d);
+  const patternScore = scorePattern(snap);
+  const newsScore = await scoreNews(snap).catch(() => 0);
+
+  const score = rsiScore * WEIGHTS.rsi
+    + trendScore * WEIGHTS.trend
+    + momentumScore * WEIGHTS.momentum
+    + patternScore * WEIGHTS.pattern
+    + newsScore * WEIGHTS.news;
+
+  const threshold = state.config.minConfidence;
+  let action = 'hold';
+  if (score >= threshold) action = 'buy';
+  else if (score <= -threshold && position) action = 'sell'; // no shorting — sell only if holding
+
+  const reason = `score ${score.toFixed(2)} (RSI ${rsiScore.toFixed(2)}, trend ${trendScore.toFixed(2)}, momentum ${momentumScore.toFixed(2)}, pattern ${patternScore.toFixed(2)}, news ${newsScore.toFixed(2)})`;
+
+  return { action, confidence: Math.abs(score), reason, engine: 'Scoring' };
 }
 
 // --- Guardrails + order placement -------------------------------------------
@@ -493,8 +485,7 @@ async function runOnce(manual = false) {
     for (const symbol of state.config.watchlist) {
       try {
         const snap = await buildSnapshot(symbol);
-        const patternHit = detectPatterns(snap, positionsBySymbol[symbol]);
-        const decision = patternHit || await decide(snap, positionsBySymbol[symbol]);
+        const decision = await decide(snap, positionsBySymbol[symbol]);
         let result = { executed: false, note: 'analysis only' };
         if (clock.is_open) {
           result = await maybeTrade(snap, decision, positionsBySymbol, account);
