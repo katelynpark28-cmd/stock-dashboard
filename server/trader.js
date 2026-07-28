@@ -595,4 +595,13 @@ export const trader = {
     await runOnce(true);
     return this.getState();
   },
+  async restoreExecutedTrades(entries) {
+    const existingTimes = new Set(state.executedTrades.map(e => e.time));
+    const toAdd = (entries || []).filter(e => !existingTimes.has(e.time));
+    state.executedTrades = [...toAdd, ...state.executedTrades]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 200);
+    await saveState();
+    return this.getState();
+  },
 };

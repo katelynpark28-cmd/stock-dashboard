@@ -612,6 +612,13 @@ app.post('/api/trader/config', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+// Temporary: one-time recovery of trade journal entries lost when Redis
+// persistence was enabled (see commit history around 2026-07-27).
+app.post('/api/trader/restore-trades', async (req, res) => {
+  try { res.json(await trader.restoreExecutedTrades(req.body.entries || [])); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 app.post('/api/trader/run', async (req, res) => {
   try { res.json(await trader.runNow()); }
   catch (e) { res.status(500).json({ error: e.message }); }
