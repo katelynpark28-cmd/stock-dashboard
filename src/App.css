@@ -878,6 +878,7 @@ body {
 .at-table td { padding: 9px 8px; color: #cbd5e1; }
 .at-table tbody tr:not(:last-child) td { border-bottom: 1px solid #232634; }
 .at-sym { font-weight: 700; color: #fff; }
+.at-reason { color: #8a94a8; font-size: 0.82rem; font-style: italic; max-width: 260px; }
 .at-table small { opacity: 0.75; font-size: 0.78rem; }
 
 @media (max-width: 900px) {

@@ -18,6 +18,32 @@ const timeAgo = (iso) => {
   return `${Math.floor(s / 3600)}h ago`;
 };
 
+// The scoring engine's reason string is a technical breakdown like
+// "score 0.42 (RSI 0.84, trend -1.00, momentum -0.03, pattern 1.00, news 0.40)".
+// This turns that into a short, plain-English explanation by naming whichever
+// 1-2 factors actually drove the decision, instead of showing raw numbers.
+// Reasons from other sources (stop loss, take profit, exit errors) are
+// already plain English, so they pass through unchanged.
+function summarizeReason(reason) {
+  if (!reason) return '—';
+  const m = reason.match(/^score (-?[\d.]+) \(RSI (-?[\d.]+), trend (-?[\d.]+), momentum (-?[\d.]+), pattern (-?[\d.]+), news (-?[\d.]+)\)$/);
+  if (!m) return reason;
+  const [, , rsi, trend, momentum, pattern, news] = m.map(Number);
+  const factors = [
+    { value: rsi, pos: 'oversold RSI', neg: 'overbought RSI' },
+    { value: trend, pos: 'price trending above average', neg: 'price trending below average' },
+    { value: momentum, pos: 'upward momentum', neg: 'downward momentum' },
+    { value: pattern, pos: 'a bullish candlestick pattern', neg: 'a bearish candlestick pattern' },
+    { value: news, pos: 'positive news sentiment', neg: 'negative news sentiment' },
+  ]
+    .filter(f => Math.abs(f.value) >= 0.15)
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    .slice(0, 2)
+    .map(f => f.value > 0 ? f.pos : f.neg);
+  if (!factors.length) return 'No single factor stood out — a mix of small signals.';
+  return factors.join(' and ');
+}
+
 // Every ticker mention across the page uses this: opens that ticker's
 // research page in a new tab, and shows the full company name on hover.
 function TickerLink({ symbol, name, className = '' }) {
@@ -707,7 +733,7 @@ export default function AutoTrader() {
           <p className="at-empty">No executed trades yet.</p>
         ) : (
           <table className="at-table">
-            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Price</th></tr></thead>
+            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Why</th><th>Price</th></tr></thead>
             <tbody>
               {journal.map((d, i) => (
                 <tr key={i}>
@@ -715,6 +741,7 @@ export default function AutoTrader() {
                   <td className="at-sym"><TickerLink symbol={d.symbol} name={tickerNames[d.symbol]} /></td>
                   <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
                   <td>{d.note}</td>
+                  <td className="at-reason">{summarizeReason(d.reason)}</td>
                   <td>{money(d.price)}</td>
                 </tr>
               ))}
