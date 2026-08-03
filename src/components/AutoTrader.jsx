@@ -733,11 +733,11 @@ export default function AutoTrader() {
           <p className="at-empty">No executed trades yet.</p>
         ) : (
           <table className="at-table">
-            <thead><tr><th>Time (ET)</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th></tr></thead>
+            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th></tr></thead>
             <tbody>
               {journal.map((d, i) => (
                 <tr key={i}>
-                  <td>{new Date(d.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })}</td>
+                  <td>{new Date(d.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</td>
                   <td className="at-sym"><TickerLink symbol={d.symbol} name={tickerNames[d.symbol]} /></td>
                   <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
                   <td>{d.note}</td>
