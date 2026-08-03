@@ -733,7 +733,7 @@ export default function AutoTrader() {
           <p className="at-empty">No executed trades yet.</p>
         ) : (
           <table className="at-table">
-            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Why</th><th>Price</th></tr></thead>
+            <thead><tr><th>Time</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th></tr></thead>
             <tbody>
               {journal.map((d, i) => (
                 <tr key={i}>
