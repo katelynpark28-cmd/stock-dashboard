@@ -44,6 +44,24 @@ function summarizeReason(reason) {
   return factors.join(' and ');
 }
 
+// Sells logged before the P&L column existed don't have d.pl/d.plPct stored,
+// but every stop-loss/take-profit exit already put its exact trigger percent
+// in the reason text ("Stop loss triggered at -17.2%..."), and the fill price
+// and share count are already in d.price/d.note — enough to back-derive both
+// the percent and a dollar estimate without touching any stored data.
+function derivePL(d) {
+  if (d.pl != null) return { pl: d.pl, plPct: d.plPct };
+  if (d.action !== 'sell' || !d.reason) return null;
+  const pctMatch = d.reason.match(/(?:Stop loss|Take profit) triggered at (-?[\d.]+)%/);
+  if (!pctMatch) return null;
+  const plPct = Number(pctMatch[1]);
+  const qtyMatch = d.note?.match(/sold ([\d.]+) shares/);
+  if (!qtyMatch || d.price == null) return { pl: null, plPct };
+  const qty = Number(qtyMatch[1]);
+  const pl = qty * d.price * (plPct / (100 + plPct));
+  return { pl, plPct };
+}
+
 // Every ticker mention across the page uses this: opens that ticker's
 // research page in a new tab, and shows the full company name on hover.
 function TickerLink({ symbol, name, className = '' }) {
@@ -735,19 +753,22 @@ export default function AutoTrader() {
           <table className="at-table">
             <thead><tr><th>Time (ET)</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th><th>P&L</th></tr></thead>
             <tbody>
-              {journal.map((d, i) => (
-                <tr key={i}>
-                  <td>{new Date(d.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })}</td>
-                  <td className="at-sym"><TickerLink symbol={d.symbol} name={tickerNames[d.symbol]} /></td>
-                  <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
-                  <td>{d.note}</td>
-                  <td className="at-reason">{summarizeReason(d.reason)}</td>
-                  <td>{money(d.price)}</td>
-                  <td className={d.pl == null ? '' : d.pl >= 0 ? 'pos' : 'neg'}>
-                    {d.pl == null ? '—' : <>{money(d.pl)} <small>{pct(d.plPct)}</small></>}
-                  </td>
-                </tr>
-              ))}
+              {journal.map((d, i) => {
+                const plInfo = derivePL(d);
+                return (
+                  <tr key={i}>
+                    <td>{new Date(d.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })}</td>
+                    <td className="at-sym"><TickerLink symbol={d.symbol} name={tickerNames[d.symbol]} /></td>
+                    <td className={d.action === 'buy' ? 'pos' : 'neg'}>{d.action}</td>
+                    <td>{d.note}</td>
+                    <td className="at-reason">{summarizeReason(d.reason)}</td>
+                    <td>{money(d.price)}</td>
+                    <td className={!plInfo ? '' : plInfo.plPct >= 0 ? 'pos' : 'neg'}>
+                      {!plInfo ? '—' : <>{plInfo.pl == null ? '—' : money(plInfo.pl)} <small>{pct(plInfo.plPct)}</small></>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
