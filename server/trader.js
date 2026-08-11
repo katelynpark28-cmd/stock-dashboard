@@ -122,6 +122,7 @@ let state = {
   running: false,
   watchlistDate: null,     // last date the watchlist was auto-rotated
   lastBuyTime: {},         // { SYMBOL: ISO timestamp of last executed buy } — enforces BUY_COOLDOWN_MS
+  entryExitRules: {},      // { SYMBOL: { entryPrice, lockedAt } } — set when a position opens, cleared when it closes
 };
 
 // Minimum time between consecutive buys of the SAME symbol. Without this,
@@ -157,15 +158,18 @@ async function rotateWatchlistIfNeeded() {
     if (heldSymbols.length || newPicks.length) {
       state.config.watchlist = [...heldSymbols, ...newPicks];
     }
-    // Auto-refresh ATR-based stop-loss/take-profit for the day's full
-    // watchlist, same calculation as the manual "Auto-set from volatility"
-    // button — so exit rules are fresh for the day's tickers without
-    // needing to click it, and stay put (not recomputed again) until the
-    // next rotation.
-    if (state.config.watchlist.length) {
-      const levels = await computeAtrLevels(state.config.watchlist);
+    // Auto-refresh ATR-based stop-loss/take-profit for watchlist symbols with
+    // no open position, same calculation as the manual "Auto-set from
+    // volatility" button. Symbols with an open position (state.entryExitRules
+    // has a lock for them) are skipped here so a held position's exit rule
+    // doesn't drift day to day — it stays fixed to entry until the position
+    // closes. A manual edit through the UI still applies immediately; only
+    // this automatic daily recompute is held back.
+    const toRefresh = state.config.watchlist.filter(sym => !state.entryExitRules[sym]);
+    if (toRefresh.length) {
+      const levels = await computeAtrLevels(toRefresh);
       const overrides = { ...state.config.tickerOverrides };
-      for (const sym of state.config.watchlist) {
+      for (const sym of toRefresh) {
         if (levels[sym]) {
           overrides[sym] = {
             ...(overrides[sym] || {}),
@@ -198,13 +202,14 @@ async function loadState() {
     state.equityHistory = raw.equityHistory || [];
     state.watchlistDate = raw.watchlistDate || null;
     state.lastBuyTime = raw.lastBuyTime || {};
+    state.entryExitRules = raw.entryExitRules || {};
   } catch (e) {
     console.error('Failed to load trader state (first run is normal):', e.message);
   }
 }
 
 async function saveState() {
-  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime };
+  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime, entryExitRules: state.entryExitRules };
   try {
     if (REDIS_URL && REDIS_TOKEN) {
       await redisSetState(payload);
@@ -428,6 +433,12 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
     });
     state.trades.count++;
     state.lastBuyTime[snap.symbol] = new Date().toISOString();
+    // Lock the entry price on the buy that OPENS a position, not on buys
+    // that add to one already held — later averaging-in shouldn't move the
+    // reference point the exit rule is measured against.
+    if (!position || position.qty <= 0) {
+      state.entryExitRules[snap.symbol] = { entryPrice: snap.price, lockedAt: new Date().toISOString() };
+    }
     return { executed: true, note: `bought ~$${size.toFixed(0)}` };
   }
 
@@ -443,6 +454,7 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
       time_in_force: 'day',
     });
     state.trades.count++;
+    delete state.entryExitRules[snap.symbol]; // position fully closes — every sell here is the whole position
     return { executed: true, note: `sold ${position.qty} shares`, pl: position.unrealizedPL, plPct: position.unrealizedPLPct };
   }
 
@@ -483,6 +495,18 @@ async function runOnce(manual = false) {
     state.equityHistory.push({ time: new Date().toISOString(), equity: account.equity, spy: spyPrice });
     if (state.equityHistory.length > 300) state.equityHistory = state.equityHistory.slice(-300);
 
+    // Backfill a lock for any held position that doesn't have one yet — either
+    // it was opened before this tracking existed, or bought outside the bot.
+    // avgEntry is the best available stand-in for "price when bought" there.
+    for (const pos of positions) {
+      if (!state.entryExitRules[pos.symbol]) {
+        state.entryExitRules[pos.symbol] = { entryPrice: pos.avgEntry, lockedAt: new Date().toISOString(), backfilled: true };
+      }
+    }
+    for (const sym of Object.keys(state.entryExitRules)) {
+      if (!positionsBySymbol[sym]) delete state.entryExitRules[sym]; // no longer held (e.g. closed manually via Alpaca)
+    }
+
     // --- Exit strategy: check all positions for stop loss / take profit --------
     if (clock.is_open) {
       for (const pos of positions) {
@@ -490,7 +514,13 @@ async function runOnce(manual = false) {
         const ovr = state.config.tickerOverrides?.[pos.symbol] || {};
         const sl = ovr.stopLossPct ?? state.config.stopLossPct;
         const tp = ovr.takeProfitPct ?? state.config.takeProfitPct;
-        const plPct = pos.unrealizedPLPct;
+        // Measure against the price the position was actually opened at, not
+        // Alpaca's average cost basis (which shifts every time shares are
+        // added), so exit thresholds mean the same thing they did on day one.
+        // Falls back to Alpaca's own figure for positions opened before this
+        // tracking existed or opened manually outside the bot.
+        const lock = state.entryExitRules[pos.symbol];
+        const plPct = lock ? ((pos.current - lock.entryPrice) / lock.entryPrice) * 100 : pos.unrealizedPLPct;
         let exitReason = null;
         if (sl != null && plPct <= sl) {
           exitReason = `Stop loss triggered at ${plPct.toFixed(1)}% (limit ${sl}%)`;
@@ -501,6 +531,7 @@ async function runOnce(manual = false) {
           try {
             await alpaca.createOrder({ symbol: pos.symbol, qty: pos.qty, side: 'sell', type: 'market', time_in_force: 'day' });
             state.trades.count++;
+            delete state.entryExitRules[pos.symbol];
             await addLog({ symbol: pos.symbol, action: 'sell', confidence: 1, reason: exitReason, engine: 'Exit', price: pos.current, rsi14: null, executed: true, note: `sold ${pos.qty} shares`, pl: pos.unrealizedPL, plPct: pos.unrealizedPLPct });
           } catch (e) {
             await addLog({ symbol: pos.symbol, action: 'error', confidence: 0, reason: `exit failed: ${e.message}`, engine: 'Exit', executed: false, note: 'error' });
