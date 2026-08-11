@@ -443,7 +443,7 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
       time_in_force: 'day',
     });
     state.trades.count++;
-    return { executed: true, note: `sold ${position.qty} shares` };
+    return { executed: true, note: `sold ${position.qty} shares`, pl: position.unrealizedPL, plPct: position.unrealizedPLPct };
   }
 
   return { executed: false, note: 'hold' };
@@ -501,7 +501,7 @@ async function runOnce(manual = false) {
           try {
             await alpaca.createOrder({ symbol: pos.symbol, qty: pos.qty, side: 'sell', type: 'market', time_in_force: 'day' });
             state.trades.count++;
-            await addLog({ symbol: pos.symbol, action: 'sell', confidence: 1, reason: exitReason, engine: 'Exit', price: pos.current, rsi14: null, executed: true, note: `sold ${pos.qty} shares` });
+            await addLog({ symbol: pos.symbol, action: 'sell', confidence: 1, reason: exitReason, engine: 'Exit', price: pos.current, rsi14: null, executed: true, note: `sold ${pos.qty} shares`, pl: pos.unrealizedPL, plPct: pos.unrealizedPLPct });
           } catch (e) {
             await addLog({ symbol: pos.symbol, action: 'error', confidence: 0, reason: `exit failed: ${e.message}`, engine: 'Exit', executed: false, note: 'error' });
           }
@@ -529,6 +529,8 @@ async function runOnce(manual = false) {
           rsi14: snap.rsi14,
           executed: result.executed,
           note: result.note,
+          pl: result.pl,
+          plPct: result.plPct,
         });
       } catch (e) {
         await addLog({ symbol, action: 'error', confidence: 0, reason: e.message, executed: false, note: 'error' });

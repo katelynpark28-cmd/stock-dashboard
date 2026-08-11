@@ -733,7 +733,7 @@ export default function AutoTrader() {
           <p className="at-empty">No executed trades yet.</p>
         ) : (
           <table className="at-table">
-            <thead><tr><th>Time (ET)</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th></tr></thead>
+            <thead><tr><th>Time (ET)</th><th>Symbol</th><th>Action</th><th>Detail</th><th>Reason</th><th>Price</th><th>P&L</th></tr></thead>
             <tbody>
               {journal.map((d, i) => (
                 <tr key={i}>
@@ -743,6 +743,9 @@ export default function AutoTrader() {
                   <td>{d.note}</td>
                   <td className="at-reason">{summarizeReason(d.reason)}</td>
                   <td>{money(d.price)}</td>
+                  <td className={d.pl == null ? '' : d.pl >= 0 ? 'pos' : 'neg'}>
+                    {d.pl == null ? '—' : <>{money(d.pl)} <small>{pct(d.plPct)}</small></>}
+                  </td>
                 </tr>
               ))}
             </tbody>
