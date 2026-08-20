@@ -75,8 +75,8 @@ export async function computeAtrLevels(symbols) {
       const atr14 = trs.slice(-14).reduce((a, b) => a + b, 0) / Math.min(14, trs.slice(-14).length);
       const price = quotes[quotes.length - 1].close;
       const atrPct = (atr14 / price) * 100;
-      const sl = +(atrPct * -2).toFixed(1);
-      const tp = +(atrPct * 4).toFixed(1);
+      const sl = +(atrPct * -1.5).toFixed(1);
+      const tp = +(atrPct * 2).toFixed(1);
       results[sym] = { atr: +atr14.toFixed(2), atrPct: +atrPct.toFixed(2), stopLossPct: sl, takeProfitPct: tp };
     } catch {}
   }));
