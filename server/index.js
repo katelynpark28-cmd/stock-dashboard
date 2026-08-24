@@ -622,11 +622,6 @@ app.post('/api/trader/manual-buy', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-app.get('/api/trader/debug-test-ranking', async (req, res) => {
-  try { res.json(await trader.debugTestScoreRanking()); }
-  catch (e) { res.status(500).json({ error: e.message, stack: e.stack }); }
-});
-
 // In production, serve the built React frontend
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));

@@ -683,12 +683,6 @@ export const trader = {
     await rotateWatchlistIfNeeded();
     scheduleLoop();
   },
-  async debugTestScoreRanking() {
-    const positions = await getPositions();
-    const heldSymbols = positions.map(p => p.symbol);
-    const ranked = await rankUniverseByScore(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
-    return { attempted: GROWTH_UNIVERSE.length - heldSymbols.length, succeeded: ranked.length, top10: ranked.slice(0, 10) };
-  },
   getState() {
     return {
       config: state.config,
