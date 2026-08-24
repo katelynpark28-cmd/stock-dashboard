@@ -655,6 +655,7 @@ export const trader = {
   },
   getState() {
     return {
+      _debug: { watchlistDate: state.watchlistDate, today: today() },
       config: state.config,
       log: state.log,
       executedTrades: state.executedTrades,
