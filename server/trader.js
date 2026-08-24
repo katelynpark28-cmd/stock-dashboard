@@ -109,6 +109,7 @@ const DEFAULT_CONFIG = {
   stopLossPct: -3,         // auto-sell if position drops this % (negative number)
   takeProfitPct: 5,        // auto-sell if position gains this %
   tickerOverrides: {},     // per-ticker overrides, e.g. { TSLA: { stopLossPct: -5, takeProfitPct: 8 } }
+  minStockValue: 0,        // floor on total $ held in stock — 0 disables it
 };
 
 let state = {
@@ -393,7 +394,7 @@ async function decide(snap, position) {
 
   const reason = `score ${score.toFixed(2)} (RSI ${rsiScore.toFixed(2)}, trend ${trendScore.toFixed(2)}, momentum ${momentumScore.toFixed(2)}, pattern ${patternScore.toFixed(2)}, news ${newsScore.toFixed(2)})`;
 
-  return { action, confidence: Math.abs(score), reason, engine: 'Scoring' };
+  return { action, confidence: Math.abs(score), reason, engine: 'Scoring', score };
 }
 
 // --- Guardrails + order placement -------------------------------------------
@@ -459,6 +460,49 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
   }
 
   return { executed: false, note: 'hold' };
+}
+
+// If total stock value has fallen below config.minStockValue (e.g. after a
+// wave of profit-taking sells), deploy cash into whichever watchlist symbols
+// still score positively this cycle, strongest first, until back at the
+// floor. Deliberately does NOT buy a symbol the model currently reads as
+// bearish just to hit the number — if nothing scores above 0, the floor can
+// go unmet rather than fight the model's own signal.
+async function topUpToFloor(positions, positionsBySymbol, account, scores) {
+  const floor = state.config.minStockValue;
+  if (!floor) return;
+  const totalStockValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
+  let deficit = floor - totalStockValue;
+  if (deficit <= 0) return;
+
+  const candidates = Object.entries(scores)
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  let cashRemaining = account.cash * 0.95;
+  for (const [symbol, score] of candidates) {
+    if (deficit <= 0 || cashRemaining < 1) break;
+    if (state.trades.count >= state.config.maxTradesPerDay) break;
+    const position = positionsBySymbol[symbol];
+    const currentExposure = position ? position.marketValue : 0;
+    const room = state.config.maxPositionDollars - currentExposure;
+    if (room <= 1) continue;
+    const size = Math.min(state.config.perTradeDollars, room, deficit, cashRemaining);
+    if (size < 1) continue;
+    try {
+      await alpaca.createOrder({ symbol, notional: +size.toFixed(2), side: 'buy', type: 'market', time_in_force: 'day' });
+      state.trades.count++;
+      state.lastBuyTime[symbol] = new Date().toISOString();
+      // Entry-price lock for a brand-new position gets picked up by the
+      // regular per-cycle backfill pass (using avgEntry once the order has
+      // actually filled) — same path pre-existing/manual positions use.
+      deficit -= size;
+      cashRemaining -= size;
+      await addLog({ symbol, action: 'buy', confidence: score, reason: `Floor rule: total stock value below $${floor.toLocaleString()} target`, engine: 'Floor Rule', executed: true, note: `bought ~$${size.toFixed(0)}` });
+    } catch (e) {
+      await addLog({ symbol, action: 'error', confidence: 0, reason: `floor rule buy failed: ${e.message}`, engine: 'Floor Rule', executed: false, note: 'error' });
+    }
+  }
 }
 
 // --- Main loop ---------------------------------------------------------------
@@ -540,10 +584,12 @@ async function runOnce(manual = false) {
       }
     }
 
+    const scores = {};
     for (const symbol of state.config.watchlist) {
       try {
         const snap = await buildSnapshot(symbol);
         const decision = await decide(snap, positionsBySymbol[symbol]);
+        if (typeof decision.score === 'number') scores[symbol] = decision.score;
         let result = { executed: false, note: 'analysis only' };
         if (clock.is_open) {
           result = await maybeTrade(snap, decision, positionsBySymbol, account);
@@ -567,6 +613,11 @@ async function runOnce(manual = false) {
         await addLog({ symbol, action: 'error', confidence: 0, reason: e.message, executed: false, note: 'error' });
       }
     }
+
+    if (clock.is_open) {
+      await topUpToFloor(positions, positionsBySymbol, account, scores);
+    }
+
     state.lastRun = new Date().toISOString();
     state.lastRunNote = clock.is_open ? 'ran' : 'analysis only (market closed)';
   } catch (e) {

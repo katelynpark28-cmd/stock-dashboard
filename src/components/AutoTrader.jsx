@@ -317,6 +317,7 @@ export default function AutoTrader() {
       maxTradesPerDay: +form.maxTradesPerDay,
       stopLossPct: +form.stopLossPct,
       takeProfitPct: +form.takeProfitPct,
+      minStockValue: +form.minStockValue || 0,
       tickerOverrides,
     });
   }
@@ -343,6 +344,7 @@ export default function AutoTrader() {
     maxTradesPerDay: 10,
     stopLossPct: -3,
     takeProfitPct: 5,
+    minStockValue: 0,
     tickerOverrides: {},
   };
 
@@ -376,6 +378,7 @@ export default function AutoTrader() {
         maxTradesPerDay: +updatedForm.maxTradesPerDay,
         stopLossPct: +updatedForm.stopLossPct,
         takeProfitPct: +updatedForm.takeProfitPct,
+        minStockValue: +updatedForm.minStockValue || 0,
         tickerOverrides: overrides,
       });
     } catch (e) {
@@ -668,6 +671,11 @@ export default function AutoTrader() {
             <span>Max trades / day</span>
             <input type="number" min="1" value={form.maxTradesPerDay} disabled={!isAdmin}
               onChange={e => setForm({ ...form, maxTradesPerDay: e.target.value })} />
+          </label>
+          <label className="at-field" title="If total $ held in stock drops below this, the bot tops up with whichever watchlist symbols still score positively — 0 disables it">
+            <span>Min $ in stock</span>
+            <input type="number" min="0" value={form.minStockValue ?? 0} disabled={!isAdmin}
+              onChange={e => setForm({ ...form, minStockValue: e.target.value })} />
           </label>
           {isAdmin && <div className="at-settings-actions">
             <button className="at-save-btn" onClick={saveSettings} disabled={saving}>
