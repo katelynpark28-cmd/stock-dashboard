@@ -266,7 +266,7 @@ Respond in this exact JSON format:
 }`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-20b',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.4,
@@ -370,7 +370,7 @@ app.get('/api/screener', async (req, res) => {
     let reasons = {};
     try {
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-20b',
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
         temperature: 0.4,
@@ -446,7 +446,7 @@ app.post('/api/chat', async (req, res) => {
       : `You are StocKP Assistant, an expert financial analyst embedded in a stock research dashboard. Answer questions about stocks, markets, and investing clearly and concisely. Be direct and opinionated where helpful.`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: system },
         ...messages.map(m => ({ role: m.role, content: m.content })),

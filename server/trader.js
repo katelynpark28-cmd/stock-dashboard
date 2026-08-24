@@ -61,7 +61,7 @@ const gemini = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.G
 
 async function askGroq(prompt) {
   const c = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-oss-20b',
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
     temperature: 0.3,
