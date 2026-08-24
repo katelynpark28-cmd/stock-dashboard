@@ -622,6 +622,11 @@ app.post('/api/trader/manual-buy', async (req, res) => {
   catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+app.post('/api/trader/pin-watchlist', async (req, res) => {
+  try { res.json(await trader.pinWatchlist(req.body?.watchlist || [], req.body?.pinnedUntil || null)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // In production, serve the built React frontend
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));

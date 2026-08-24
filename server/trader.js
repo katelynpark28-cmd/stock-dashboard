@@ -125,6 +125,7 @@ let state = {
   lastBuyTime: {},         // { SYMBOL: ISO timestamp of last executed buy } — enforces BUY_COOLDOWN_MS
   entryExitRules: {},      // { SYMBOL: { entryPrice, lockedAt } } — set when a position opens, cleared when it closes
   watchlistHistory: [],    // [{ date, watchlist }] — one snapshot per day the watchlist actually rotated, newest first
+  watchlistPinnedUntil: null, // date string — while set, auto-rotation is skipped entirely (for manual test watchlists)
 };
 
 // Minimum time between consecutive buys of the SAME symbol. Without this,
@@ -171,6 +172,7 @@ async function rankUniverseByScore(symbols) {
 
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
+  if (state.watchlistPinnedUntil && todayStr <= state.watchlistPinnedUntil) return;
   if (state.watchlistDate === todayStr) return;
   try {
     const positions = await getPositions();
@@ -234,13 +236,14 @@ async function loadState() {
     state.lastBuyTime = raw.lastBuyTime || {};
     state.entryExitRules = raw.entryExitRules || {};
     state.watchlistHistory = raw.watchlistHistory || [];
+    state.watchlistPinnedUntil = raw.watchlistPinnedUntil || null;
   } catch (e) {
     console.error('Failed to load trader state (first run is normal):', e.message);
   }
 }
 
 async function saveState() {
-  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime, entryExitRules: state.entryExitRules, watchlistHistory: state.watchlistHistory.slice(0, 60) };
+  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime, entryExitRules: state.entryExitRules, watchlistHistory: state.watchlistHistory.slice(0, 60), watchlistPinnedUntil: state.watchlistPinnedUntil };
   try {
     if (REDIS_URL && REDIS_TOKEN) {
       await redisSetState(payload);
@@ -682,6 +685,24 @@ export const trader = {
     await loadState();
     await rotateWatchlistIfNeeded();
     scheduleLoop();
+  },
+  // Manual test override: replaces the watchlist and freezes daily
+  // auto-rotation through the given date (inclusive), so the override
+  // actually survives the next day-rollover instead of being silently
+  // overwritten by the normal held+rotating-picks logic. Rotation resumes
+  // automatically the day after pinnedUntil.
+  async pinWatchlist(watchlist, pinnedUntil) {
+    state.config.watchlist = watchlist;
+    state.watchlistPinnedUntil = pinnedUntil;
+    const todayStr = today();
+    if (!state.watchlistHistory.some(h => h.date === todayStr)) {
+      state.watchlistHistory.unshift({ date: todayStr, watchlist: [...watchlist] });
+      state.watchlistHistory = state.watchlistHistory.slice(0, 60);
+    } else {
+      state.watchlistHistory[0] = { date: todayStr, watchlist: [...watchlist] };
+    }
+    await saveState();
+    return this.getState();
   },
   getState() {
     return {
