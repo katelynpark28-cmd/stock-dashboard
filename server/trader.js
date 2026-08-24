@@ -653,21 +653,8 @@ export const trader = {
     await rotateWatchlistIfNeeded();
     scheduleLoop();
   },
-  async debugForceRotate() {
-    let caughtError = null;
-    try {
-      const positions = await getPositions();
-      const heldSymbols = positions.map(p => p.symbol);
-      const ranked = await rankByVolatility(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
-      return { heldSymbols, topPicks: ranked.slice(0, 10) };
-    } catch (e) {
-      caughtError = e.message + '\n' + e.stack;
-      return { error: caughtError };
-    }
-  },
   getState() {
     return {
-      _debug: { watchlistDate: state.watchlistDate, today: today() },
       config: state.config,
       log: state.log,
       executedTrades: state.executedTrades,
