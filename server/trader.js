@@ -5,7 +5,7 @@ import YahooFinanceClass from 'yahoo-finance2';
 import Groq from 'groq-sdk';
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { alpaca, getPositions } from './alpaca.js';
+import { alpaca, getPositions, getAccountSummary } from './alpaca.js';
 import { GROWTH_UNIVERSE, rankByVolatility, computeAtrLevels } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -626,6 +626,35 @@ export const trader = {
   },
   async runNow() {
     await runOnce(true);
+    return this.getState();
+  },
+  // Deliberate, user-initiated buy that skips the confidence gate — for
+  // putting idle cash to work on a symbol you've decided on yourself,
+  // separate from the bot's own signal-driven buys. Still respects the
+  // max-position cap and cash-on-hand limit, still gets the same
+  // stop-loss/take-profit entry-price lock as any other position, and is
+  // logged distinctly (engine "Manual") so it's never confused for a
+  // scoring-engine decision in the Trade Journal.
+  async manualBuy(symbolRaw, dollars) {
+    const symbol = String(symbolRaw || '').trim().toUpperCase();
+    if (!symbol) throw new Error('symbol required');
+    const [positions, account] = await Promise.all([getPositions(), getAccountSummary()]);
+    const position = positions.find(p => p.symbol === symbol);
+    const currentExposure = position ? position.marketValue : 0;
+    const room = state.config.maxPositionDollars - currentExposure;
+    if (room <= 1) throw new Error('at max position size for symbol');
+    const size = Math.min(+dollars || state.config.perTradeDollars, room, account.cash * 0.95);
+    if (size < 1) throw new Error('insufficient cash');
+    await alpaca.createOrder({ symbol, notional: +size.toFixed(2), side: 'buy', type: 'market', time_in_force: 'day' });
+    state.trades.count++;
+    state.lastBuyTime[symbol] = new Date().toISOString();
+    const wasNewPosition = !position || position.qty <= 0;
+    const updated = (await getPositions()).find(p => p.symbol === symbol);
+    const fillPrice = updated ? updated.avgEntry : null;
+    if (wasNewPosition && fillPrice != null) {
+      state.entryExitRules[symbol] = { entryPrice: fillPrice, lockedAt: new Date().toISOString() };
+    }
+    await addLog({ symbol, action: 'buy', confidence: 1, reason: 'Manual buy', engine: 'Manual', price: fillPrice, executed: true, note: `bought ~$${size.toFixed(0)}` });
     return this.getState();
   },
 };
