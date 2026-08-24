@@ -124,6 +124,7 @@ let state = {
   watchlistDate: null,     // last date the watchlist was auto-rotated
   lastBuyTime: {},         // { SYMBOL: ISO timestamp of last executed buy } — enforces BUY_COOLDOWN_MS
   entryExitRules: {},      // { SYMBOL: { entryPrice, lockedAt } } — set when a position opens, cleared when it closes
+  watchlistHistory: [],    // [{ date, watchlist }] — one snapshot per day the watchlist actually rotated, newest first
 };
 
 // Minimum time between consecutive buys of the SAME symbol. Without this,
@@ -185,6 +186,14 @@ async function rotateWatchlistIfNeeded() {
     console.error('Watchlist volatility rotation failed, keeping previous watchlist:', e.message);
   }
   state.watchlistDate = todayStr;
+  // One snapshot per calendar day, even if rotation itself failed above (that
+  // still accurately records "watchlist stayed the same today"). Without
+  // this, only today's list ever survives — there was no way to answer
+  // "what was on the watchlist last Tuesday".
+  if (!state.watchlistHistory.some(h => h.date === todayStr)) {
+    state.watchlistHistory.unshift({ date: todayStr, watchlist: [...state.config.watchlist] });
+    state.watchlistHistory = state.watchlistHistory.slice(0, 60);
+  }
   await saveState();
 }
 
@@ -204,13 +213,14 @@ async function loadState() {
     state.watchlistDate = raw.watchlistDate || null;
     state.lastBuyTime = raw.lastBuyTime || {};
     state.entryExitRules = raw.entryExitRules || {};
+    state.watchlistHistory = raw.watchlistHistory || [];
   } catch (e) {
     console.error('Failed to load trader state (first run is normal):', e.message);
   }
 }
 
 async function saveState() {
-  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime, entryExitRules: state.entryExitRules };
+  const payload = { config: state.config, log: state.log.slice(0, 200), executedTrades: state.executedTrades.slice(0, 200), trades: state.trades, equityHistory: state.equityHistory.slice(-300), watchlistDate: state.watchlistDate, lastBuyTime: state.lastBuyTime, entryExitRules: state.entryExitRules, watchlistHistory: state.watchlistHistory.slice(0, 60) };
   try {
     if (REDIS_URL && REDIS_TOKEN) {
       await redisSetState(payload);
@@ -663,6 +673,7 @@ export const trader = {
       lastRunNote: state.lastRunNote,
       engines: ENGINES.map(e => ({ name: e.name, available: e.available() })),
       equityHistory: state.equityHistory,
+      watchlistHistory: state.watchlistHistory,
     };
   },
   async setConfig(patch) {
