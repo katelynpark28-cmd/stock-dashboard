@@ -40,7 +40,7 @@ export default function AIAnalysis({ data }) {
       <div className="ai-title-row">
         <span className="ai-icon">✦</span>
         <span className="ai-label">AI Summary</span>
-        <span className="ai-badge">Groq · Llama 3.3</span>
+        <span className="ai-badge">Groq · GPT-OSS 20B</span>
       </div>
 
       {loading && (
