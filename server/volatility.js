@@ -44,18 +44,6 @@ export async function fetchRecentVolatility(symbol) {
   return annualizedRecentVolatility(closes);
 }
 
-// Ranks a universe of symbols by current realized volatility, highest first.
-// Symbols whose volatility can't be computed are dropped.
-export async function rankByVolatility(universe) {
-  const scored = await Promise.all(universe.map(async symbol => {
-    const vol = await fetchRecentVolatility(symbol).catch(() => null);
-    return { symbol, volatility: vol };
-  }));
-  return scored
-    .filter(s => s.volatility != null)
-    .sort((a, b) => b.volatility - a.volatility);
-}
-
 // ATR(14)-based stop-loss/take-profit suggestion per symbol — wider exits for
 // choppier stocks, tighter for calmer ones. Shared by the manual "Auto-set
 // from volatility" button and the bot's automatic daily refresh.

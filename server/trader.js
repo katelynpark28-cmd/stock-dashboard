@@ -6,7 +6,7 @@ import Groq from 'groq-sdk';
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { alpaca, getPositions, getAccountSummary } from './alpaca.js';
-import { GROWTH_UNIVERSE, rankByVolatility, computeAtrLevels } from './volatility.js';
+import { GROWTH_UNIVERSE, computeAtrLevels } from './volatility.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(__dirname, 'trader-state.json');
@@ -149,13 +149,33 @@ function today() {
 // holdings fill a fixed total size.
 const ROTATING_PICKS = 8;
 
+// Runs the same weighted scoring model used for live buy/sell decisions
+// across the whole growth universe, so the daily rotation reflects "which of
+// these does the model currently like" rather than just "which is moving the
+// most" (volatility is direction-agnostic — a stock crashing hard looks just
+// as volatile as one rallying hard). No position is held for any of these
+// yet, so decide() can only ever return hold/buy here, never sell, which is
+// fine since only the raw score is used for ranking.
+async function rankUniverseByScore(symbols) {
+  const scored = await Promise.all(symbols.map(async (symbol) => {
+    try {
+      const snap = await buildSnapshot(symbol);
+      const decision = await decide(snap, null);
+      return { symbol, score: decision.score };
+    } catch {
+      return { symbol, score: null };
+    }
+  }));
+  return scored.filter(s => s.score != null).sort((a, b) => b.score - a.score);
+}
+
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
   if (state.watchlistDate === todayStr) return;
   try {
     const positions = await getPositions();
     const heldSymbols = positions.map(p => p.symbol);
-    const ranked = await rankByVolatility(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
+    const ranked = await rankUniverseByScore(GROWTH_UNIVERSE.filter(s => !heldSymbols.includes(s)));
     const newPicks = ranked.slice(0, ROTATING_PICKS).map(r => r.symbol);
     if (heldSymbols.length || newPicks.length) {
       state.config.watchlist = [...heldSymbols, ...newPicks];
