@@ -649,8 +649,14 @@ export const trader = {
     state.trades.count++;
     state.lastBuyTime[symbol] = new Date().toISOString();
     const wasNewPosition = !position || position.qty <= 0;
-    const updated = (await getPositions()).find(p => p.symbol === symbol);
-    const fillPrice = updated ? updated.avgEntry : null;
+    // Paper-order fills sometimes take a moment to show up in the position
+    // list, so retry briefly rather than logging a blank price.
+    let fillPrice = null;
+    for (let attempt = 0; attempt < 4 && fillPrice == null; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
+      const updated = (await getPositions()).find(p => p.symbol === symbol);
+      fillPrice = updated ? updated.avgEntry : null;
+    }
     if (wasNewPosition && fillPrice != null) {
       state.entryExitRules[symbol] = { entryPrice: fillPrice, lockedAt: new Date().toISOString() };
     }
