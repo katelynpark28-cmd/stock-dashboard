@@ -146,7 +146,7 @@ function today() {
 // positions are held, so there's always fresh daily rotation on top of
 // whatever you're holding, rather than rotation shrinking to zero once
 // holdings fill a fixed total size.
-const ROTATING_PICKS = 5;
+const ROTATING_PICKS = 8;
 
 async function rotateWatchlistIfNeeded() {
   const todayStr = today();
