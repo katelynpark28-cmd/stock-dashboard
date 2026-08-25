@@ -719,9 +719,15 @@ export const trader = {
   },
   async setConfig(patch) {
     state.config = { ...state.config, ...patch };
-    // sanitize
-    state.config.watchlist = (state.config.watchlist || [])
-      .map(s => String(s).trim().toUpperCase()).filter(Boolean).slice(0, 20);
+    // Only sanitize the watchlist when this call is actually the one setting
+    // it. Previously this ran unconditionally on every save, so an unrelated
+    // edit (e.g. the per-ticker exit-rule auto-save, which only sends
+    // tickerOverrides) would silently re-cap the existing watchlist at 20
+    // as a side effect.
+    if (patch.watchlist) {
+      state.config.watchlist = state.config.watchlist
+        .map(s => String(s).trim().toUpperCase()).filter(Boolean).slice(0, 20);
+    }
     state.config.intervalMinutes = Math.max(1, Math.min(240, +state.config.intervalMinutes || 15));
     await saveState();
     scheduleLoop();
