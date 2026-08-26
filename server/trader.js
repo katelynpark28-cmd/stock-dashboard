@@ -495,6 +495,17 @@ async function maybeTrade(snap, decision, positionsBySymbol, account) {
   return { executed: false, note: 'hold' };
 }
 
+// Paper-order fills sometimes take a moment to show up in the position list,
+// so retry briefly rather than logging a blank fill price.
+async function getFillPrice(symbol) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
+    const updated = (await getPositions()).find(p => p.symbol === symbol);
+    if (updated) return updated.avgEntry;
+  }
+  return null;
+}
+
 // If total stock value has fallen below config.minStockValue (e.g. after a
 // wave of profit-taking sells), deploy cash into whichever watchlist symbols
 // still score positively this cycle, strongest first, until back at the
@@ -531,7 +542,8 @@ async function topUpToFloor(positions, positionsBySymbol, account, scores) {
       // actually filled) — same path pre-existing/manual positions use.
       deficit -= size;
       cashRemaining -= size;
-      await addLog({ symbol, action: 'buy', confidence: score, reason: `Floor rule: total stock value below $${floor.toLocaleString()} target`, engine: 'Floor Rule', executed: true, note: `bought ~$${size.toFixed(0)}` });
+      const fillPrice = await getFillPrice(symbol);
+      await addLog({ symbol, action: 'buy', confidence: score, reason: `Floor rule: total stock value below $${floor.toLocaleString()} target`, engine: 'Floor Rule', price: fillPrice, executed: true, note: `bought ~$${size.toFixed(0)}` });
     } catch (e) {
       await addLog({ symbol, action: 'error', confidence: 0, reason: `floor rule buy failed: ${e.message}`, engine: 'Floor Rule', executed: false, note: 'error' });
     }
@@ -758,14 +770,7 @@ export const trader = {
     state.trades.count++;
     state.lastBuyTime[symbol] = new Date().toISOString();
     const wasNewPosition = !position || position.qty <= 0;
-    // Paper-order fills sometimes take a moment to show up in the position
-    // list, so retry briefly rather than logging a blank price.
-    let fillPrice = null;
-    for (let attempt = 0; attempt < 4 && fillPrice == null; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
-      const updated = (await getPositions()).find(p => p.symbol === symbol);
-      fillPrice = updated ? updated.avgEntry : null;
-    }
+    const fillPrice = await getFillPrice(symbol);
     if (wasNewPosition && fillPrice != null) {
       state.entryExitRules[symbol] = { entryPrice: fillPrice, lockedAt: new Date().toISOString() };
     }
