@@ -749,16 +749,6 @@ export const trader = {
     await runOnce(true);
     return this.getState();
   },
-  async debugBackfillPrices(priceBySymbolEngine) {
-    for (const entry of state.executedTrades) {
-      if (entry.price == null) {
-        const key = `${entry.symbol}:${entry.engine}`;
-        if (priceBySymbolEngine[key] != null) entry.price = priceBySymbolEngine[key];
-      }
-    }
-    await saveState();
-    return this.getState();
-  },
   // Deliberate, user-initiated buy that skips the confidence gate — for
   // putting idle cash to work on a symbol you've decided on yourself,
   // separate from the bot's own signal-driven buys. Still respects the
