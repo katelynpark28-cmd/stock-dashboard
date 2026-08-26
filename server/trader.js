@@ -745,6 +745,15 @@ export const trader = {
     scheduleLoop();
     return this.getState();
   },
+  async debugRestoreTrades(entries) {
+    const existingKeys = new Set(state.executedTrades.map(e => `${e.symbol}:${e.action}:${e.time.slice(0, 16)}`));
+    const toAdd = (entries || []).filter(e => !existingKeys.has(`${e.symbol}:${e.action}:${e.time.slice(0, 16)}`));
+    state.executedTrades = [...toAdd, ...state.executedTrades]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 200);
+    await saveState();
+    return { added: toAdd.length, total: state.executedTrades.length };
+  },
   async runNow() {
     await runOnce(true);
     return this.getState();
